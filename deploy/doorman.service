@@ -1,0 +1,43 @@
+# Doorman as a systemd service: starts at boot, restarts if it dies.
+# Do not edit this copy by hand -- deploy/install-service.sh substitutes the
+# placeholders and writes the result to /etc/systemd/system/doorman.service.
+[Unit]
+Description=Doorman -- unit manager for Kindoo door access
+Documentation=https://github.com/alfy32/doorman
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__GROUP__
+WorkingDirectory=__DIR__
+ExecStart=__DIR__/.venv/bin/python -m doorman
+
+# Config is read-only in /etc; the database and session key live in
+# /var/lib/doorman, which systemd creates and chowns via StateDirectory.
+Environment=DOORMAN_CONFIG=/etc/doorman/config.json
+Environment=DOORMAN_DATA_DIR=/var/lib/doorman
+StateDirectory=doorman
+StateDirectoryMode=0750
+# Unbuffered, so log lines reach journalctl as they happen.
+Environment=PYTHONUNBUFFERED=1
+
+Restart=on-failure
+RestartSec=5s
+
+# The service reads its checkout and /etc, and writes only its StateDirectory.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

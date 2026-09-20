@@ -4,6 +4,7 @@ Everything site-specific -- credentials, environment id, unit names -- lives in
 ONE file that is never committed:
 
     local/config.json          (git-ignored; copy config.example.json to start)
+    /etc/doorman/config.json   (system install; see deploy/install-service.sh)
 
 Override the location with DOORMAN_CONFIG. Any value can also be supplied by an
 environment variable (KINDOO_TOKEN, KINDOO_EID, ...), which wins over the file,
@@ -18,12 +19,22 @@ ROOT = Path(__file__).resolve().parent.parent
 EXAMPLE = ROOT / "config.example.json"
 
 
+ETC = Path("/etc/doorman/config.json")
+
+
 def config_path():
+    """First of: $DOORMAN_CONFIG, local/config.json, /etc/doorman/config.json.
+
+    local/ wins over /etc so a checkout you are working in keeps using its own
+    config even on a machine that also has Doorman installed system-wide.
+    """
     env = os.environ.get("DOORMAN_CONFIG")
     if env:
         return Path(env)
     site = ROOT / "local" / "config.json"
-    return site if site.exists() else EXAMPLE
+    if site.exists():
+        return site
+    return ETC if ETC.exists() else EXAMPLE
 
 
 def load(path=None):
@@ -34,9 +45,6 @@ def load(path=None):
         return {}
     except json.JSONDecodeError as e:
         raise SystemExit(f"\n{path} is not valid JSON:\n  {e}\n")
-
-
-SITE_PATH = ROOT / "local" / "config.json"
 
 
 class Settings:

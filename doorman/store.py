@@ -1,17 +1,22 @@
-"""Local database (SQLite, local/doorman.db -- never committed).
+"""Local database (SQLite -- never committed).
 
 Holds Doorman's own accounts and each manager's runtime settings. Site-wide
 reference data (environment id, canonical unit names, and the list of email
-addresses allowed to sign up) stays in local/config.json, which is hand-edited.
+addresses allowed to sign up) stays in config.json, which is hand-edited.
 
 Only this module knows about SQLite; if a server database is ever needed, the
 rest of the app is unaffected.
 """
-import json, sqlite3
+import json, os, sqlite3
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = ROOT / "local" / "doorman.db"
+
+# Mutable state -- the database and the session key -- lives here. Defaults to
+# local/ in the checkout, which suits running from a clone. A system install
+# sets DOORMAN_DATA_DIR=/var/lib/doorman so the data outlives the checkout.
+DATA_DIR = Path(os.environ.get("DOORMAN_DATA_DIR") or ROOT / "local")
+DB_PATH = DATA_DIR / "doorman.db"
 
 SCHEMA = """
 -- Superseded by `accounts` when sign-in moved to email + password.

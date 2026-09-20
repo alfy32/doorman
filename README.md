@@ -91,6 +91,50 @@ It binds to `127.0.0.1` by default. It serves plain HTTP and has no transport
 security of its own, so **do not expose it directly**. Put an authenticating
 proxy in front (Cloudflare Tunnel + Access, or similar) for remote access.
 
+### As a systemd service
+
+On the server, from a clone:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/pip install -r requirements.txt
+sudo ./deploy/install-service.sh
+```
+
+That installs `doorman.service`, enables it at boot, starts it, and waits to
+confirm something is actually listening before claiming success. It runs as the
+user who invoked `sudo`, never as root.
+
+A system install keeps its data outside the checkout, so re-cloning or
+`git clean` cannot take the database with it:
+
+| | |
+|---|---|
+| `/etc/doorman/config.json` | site config; mode 0600, read-only to the service |
+| `/var/lib/doorman/` | database and session key (`StateDirectory`) |
+| `journalctl -u doorman` | logs |
+
+The installer seeds both from `local/` if it finds them, copying rather than
+moving, and never overwrites a file that is already there. Config resolution is
+`$DOORMAN_CONFIG`, then `local/config.json`, then `/etc/doorman/config.json` --
+so a checkout you are working in still uses its own config on a machine that
+also runs the service. `$DOORMAN_DATA_DIR` does the same for the database.
+
+Day to day:
+
+```bash
+sudo systemctl status doorman      # is it up
+sudo systemctl restart doorman     # after a git pull
+journalctl -u doorman -f           # follow the log
+```
+
+Because it stays on `127.0.0.1`, reach it from another machine over SSH rather
+than by changing the bind address:
+
+```bash
+ssh -L 8000:127.0.0.1:8000 you@server    # then open http://127.0.0.1:8000
+```
+
 ## Layout
 
 ```
@@ -103,6 +147,7 @@ doorman/
   web/app.py    routes
   web/static/   stylesheet, served with a content hash for cache-busting
 local/          site config, database, session key (git-ignored)
+deploy/         systemd unit and installer for running it as a service
 ```
 
 ## Notes on the Kindoo API
