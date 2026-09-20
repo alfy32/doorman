@@ -1,0 +1,64 @@
+{% extends "base.html" %}{% block body %}
+<p class="sub" style="margin-top:0"><a href="/units">&larr; all units</a></p>
+
+<div class="statline">
+  <span class="n">{{ rows|length }}{% if alloc %}/{{ alloc }}{% endif %}</span>
+  <span>{{ unit }}</span>
+  {% if alloc and rows|length > alloc %}<span class="warnb">{{ rows|length - alloc }} over</span>
+  {% elif alloc %}<span class="muted">{{ alloc - rows|length }} spare</span>{% endif %}
+  <span class="muted">&middot;</span>
+  <span class="muted">{{ idle }} idle {{ window }}d</span>
+</div>
+
+<div class="card">
+  <h2>People</h2>
+  <input type="search" id="filter" placeholder="Filter by name, email or calling"
+         style="margin-bottom:6px" oninput="filterPeople(this.value)">
+  <div class="people-head">
+    <span class="a">Name</span><span class="b">Email</span>
+    <span class="c">Calling</span><span class="d">Last door</span><span class="e"></span>
+  </div>
+  <ul class="people" id="people">
+    {% for r in rows %}
+    <li data-search="{{ (r.name ~ ' ' ~ r.email ~ ' ' ~ r.desc)|lower }}">
+      <div class="who">
+        <div class="nm"><a class="personlink" href="/person?uid={{ r.uid }}">{% if r.has_name %}{{ r.name }}{% else %}<span class="noname">no name yet</span>{% endif %}</a></div>
+        <div class="em">{{ r.email }}</div>
+        <div class="ds">
+          {{ r.desc }}
+          {% if not r.accepted or r.temp %}
+          <div class="tags">
+            {% if not r.accepted %}<span class="chip bad">invited {{ r.invited_on or '?' }} &middot; not accepted</span>{% endif %}
+            {% if r.temp %}<span class="chip warn">temp {{ (r.expiry or '')[:10] }}</span>{% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="meta">
+        <div class="when">
+          {% if r.last %}<b>{{ r.days }}d ago</b><span class="dt">{{ r.last[:10] }}</span>
+          {% elif r.denied %}<b style="color:var(--bad)">denied</b><span class="dt">tried {{ r.denied_days }}d ago</span>
+          {% else %}<b>never</b><span class="dt">in {{ window }}d</span>{% endif %}
+        </div>
+
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if not rows %}<p class="muted">Nobody in this unit.</p>{% endif %}
+  <p class="sub" id="nomatch" style="display:none">Nothing matches that filter.</p>
+  <p class="sub" style="margin-bottom:0">Read-only — this is another unit's roster.
+    Manage your own on <a href="/">My unit</a>.</p>
+</div>
+
+<script>
+function filterPeople(q){
+  q=(q||"").trim().toLowerCase(); var shown=0;
+  document.querySelectorAll("#people li").forEach(function(li){
+    var hit=!q||li.dataset.search.indexOf(q)!==-1;
+    li.style.display=hit?"":"none"; if(hit) shown++;
+  });
+  document.getElementById("nomatch").style.display=shown?"none":"";
+}
+</script>
+{% endblock %}

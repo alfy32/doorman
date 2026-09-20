@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block body %}
+<div class="statline">
+  <span class="n">{{ count }}</span>
+  <span>changes</span>
+  <span class="muted">in the last {{ days }} days</span>
+</div>
+
+<div class="card">
+  <div class="sorthead">
+    <h2 style="margin:0">Account changes</h2>
+    <span class="sub">show:
+      <a href="/changes?days={{ days }}&amp;scope=mine" class="{{ 'on' if scope=='mine' }}">{{ my_unit or 'my unit' }}</a>
+      <a href="/changes?days={{ days }}&amp;scope=all"  class="{{ 'on' if scope=='all' }}">every unit</a>
+    </span>
+  </div>
+
+  {% if feed %}
+  <ul class="hist feed">
+    {% for h in feed %}
+    <li class="{{ h.kind }}">
+      <span class="hwhen mono">{{ h.when[:10] }}</span>
+      <span class="htext">
+        <a class="personlink" href="{{ '/history?uid=' ~ h.uid if h.gone else '/person?uid=' ~ h.uid }}"><b>{% if h.has_name %}{{ h.name }}{% else %}{{ h.email }}{% endif %}</b></a>
+        {% if h.gone %}<span class="chip">no longer in site</span>{% endif %}
+        <span class="fev">{{ h.text }}{% if h.who %} <span class="by">by {{ h.who }}</span>{% endif %}</span>
+        {% if scope != 'mine' and h.unit %}<span class="chip">{{ h.unit }}</span>{% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted" style="margin:0">No account changes in the last {{ days }} days{% if scope=='mine' %} in {{ my_unit }}{% endif %}.</p>
+  {% endif %}
+
+  <p style="margin:12px 0 0">
+    <a class="btnlink" href="/changes?days={{ more_days }}&amp;scope={{ scope }}">
+      Load {{ slice }} more days</a>
+    <span class="sub" style="margin-left:8px">showing back {{ days }} days</span>
+  </p>
+  <p class="sub" style="margin-bottom:0">Kindoo records who invited and who removed
+    a person, but not who edited one — those show no name.</p>
+</div>
+{% endblock %}

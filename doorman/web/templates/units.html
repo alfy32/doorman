@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% block body %}
+<div class="statline">
+  <span class="n {{ 'over' if cap and site_active >= cap else '' }}">{{ site_active }}/{{ cap }}</span>
+  <span>site total</span>
+  {% if cap %}<span class="{{ 'warnb' if cap-site_active <= 5 else 'muted' }}">{{ cap-site_active }} free</span>{% endif %}
+  <span class="muted">&middot;</span>
+  <span class="muted">{{ total_idle }} idle {{ window }}d</span>
+</div>
+
+<div class="card">
+  <div class="sorthead">
+    <h2 style="margin:0">People per unit</h2>
+    <span class="sub">sort:
+      <a href="/units?sort=people" class="{{ 'on' if sort not in ('idle','over') }}">people</a>
+      <a href="/units?sort=idle"   class="{{ 'on' if sort=='idle' }}">idle</a>
+      <a href="/units?sort=over"   class="{{ 'on' if sort=='over' }}">over</a>
+    </span>
+  </div>
+
+  <ul class="people units">
+    {% for r in rows %}
+    <li {% if r.mine %}class="mine"{% endif %}>
+      <div class="who">
+        <div class="nm"><a href="{{ '/' if r.mine else '/unit?name=' ~ r.unit|urlencode }}"
+          class="unitlink">{{ r.unit }}</a>{% if r.mine %} <span class="chip">you</span>{% endif %}</div>
+        <div class="ubar" title="{{ r.active }} active, {{ r.idle }} idle">
+          <i class="act" style="width:{{ (r.active / mx * 100)|round(1) }}%"></i><i
+             class="idl" style="width:{{ (r.idle / mx * 100)|round(1) }}%"></i>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="unum">
+          <b>{{ r.n }}</b>{% if r.alloc %}<span class="muted">/{{ r.alloc }}</span>{% endif %}
+        </div>
+        <div class="ustat">
+          {% if r.over %}<span class="chip bad">{{ r.diff }} over</span>
+          {% elif r.measured %}<span class="chip">{{ r.alloc - r.n }} spare</span>{% endif %}
+          <span class="chip {{ 'warn' if r.idle and r.n and (r.idle / r.n) > 0.5 }}">{{ r.idle }} idle</span>
+        </div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <p class="sub" style="margin-bottom:0">
+    <b>Idle</b> = has not opened any door in {{ window }} days — the clearest sign a unit
+    holds seats it isn't using. Units with no agreed allocation (such as
+    {{ no_unit }} or a site-wide group) show a count but aren't measured against one.
+  </p>
+</div>
+{% endblock %}

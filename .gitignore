@@ -1,0 +1,27 @@
+# --- secrets and real site data ---------------------------------------------
+# This repo is PUBLIC. Nothing describing a real environment, its doors, its
+# people, or its identifiers may be committed. All of that lives in local/.
+local/
+.env
+.env.*
+!.env.example
+*.token
+secrets/
+
+# editors / IDEs
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# scratch
+out/
+*.sqlite3
+*.db
+*.log

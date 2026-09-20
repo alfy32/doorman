@@ -1,0 +1,257 @@
+/* Doorman stylesheet.
+   Served from /static and cached by the browser; the ?v= query on the link
+   is the file's own hash, so a change busts the cache and an unchanged file
+   keeps it. */
+
+:root{
+  --bg:#f7f7f8; --panel:#fff; --ink:#18181b; --muted:#6b7280; --line:#e4e4e7;
+  --accent:#3b5bdb; --ok:#0f7b46; --warn:#b45309; --bad:#b42318; --chip:#f1f1f3;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#0f1115; --panel:#171a21; --ink:#e8e8ea; --muted:#9aa1ad; --line:#272b34;
+  --accent:#7c93f5; --ok:#3ecf8e; --warn:#f0a63a; --bad:#f26a63; --chip:#21252e;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--panel);
+  border-bottom:1px solid var(--line);padding:10px 16px}
+
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.brand{font-weight:700;letter-spacing:-.02em;font-size:17px}
+.brand small{font-weight:400;color:var(--muted);margin-left:8px;font-size:13px}
+.topbar{display:flex;align-items:center;gap:10px}
+.topacts{display:flex;align-items:center;gap:2px;flex:0 0 auto;margin-left:auto}
+
+/* Navigation is a <details> so the menu needs no JavaScript. On wide screens
+   the summary is hidden and the links sit inline as tabs; on a phone the
+   summary becomes the hamburger and the links drop below it. */
+details.menu{display:none}                 /* phone only */
+.menusep{display:none}
+details.menu summary{list-style:none;cursor:pointer}
+details.menu summary::-webkit-details-marker{display:none}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;
+  width:32px;height:32px;border-radius:999px;text-decoration:none;
+  color:var(--muted);font-size:17px;line-height:1}
+.iconbtn:hover{background:var(--chip);color:var(--accent)}
+.signout{width:auto;padding:0 10px;font-size:14px}
+.signout .ico{display:none}
+/* One row, always. If it cannot fit, it scrolls rather than wrapping into a
+   second row that looks like a broken layout. */
+nav{display:flex;gap:4px;flex-wrap:nowrap;min-width:0;margin-top:8px;
+  overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+nav::-webkit-scrollbar{display:none}
+nav a{flex:0 0 auto}
+
+
+nav a{padding:6px 12px;border-radius:999px;text-decoration:none;color:var(--muted);font-size:14px}
+nav a.on{background:var(--accent);color:#fff}
+nav a:hover:not(.on){background:var(--chip);color:var(--ink)}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);font-weight:600}
+.big{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.1}
+.sub{color:var(--muted);font-size:13px;margin-top:2px}
+.meter{height:10px;background:var(--chip);border-radius:999px;overflow:hidden;margin:12px 0 6px}
+.meter i{display:block;height:100%;background:var(--ok)}
+.meter.warn i{background:var(--warn)} .meter.bad i{background:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--muted);padding:8px;border-bottom:1px solid var(--line);font-weight:600}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.chip{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--chip);
+  font-size:12px;color:var(--muted);white-space:nowrap}
+.chip.ok{color:var(--ok)} .chip.warn{color:var(--warn)} .chip.bad{color:var(--bad)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+form.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+select,input[type=search]{padding:7px 10px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel);color:var(--ink);font-size:14px}
+button{padding:7px 14px;border:0;border-radius:8px;background:var(--accent);
+  color:#fff;font-size:14px;cursor:pointer}
+a{color:var(--accent)}
+.muted{color:var(--muted)}
+.sorthead{display:flex;align-items:baseline;justify-content:space-between;
+  gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.sorthead a{margin-left:6px;text-decoration:none;color:var(--muted)}
+.sorthead a.on{color:var(--accent);font-weight:600}
+ul.people.units li{align-items:center}
+ul.people.units .nm{font-weight:600}
+a.personlink{text-decoration:none;color:inherit}
+a.personlink:hover{color:var(--accent);text-decoration:underline}
+a.unitlink{text-decoration:none;color:var(--ink)}
+a.unitlink:hover{color:var(--accent);text-decoration:underline}
+li.mine{background:color-mix(in srgb,var(--accent) 7%,transparent);
+  border-radius:8px;padding-left:8px;padding-right:8px}
+.ubar{display:flex;height:7px;border-radius:99px;overflow:hidden;
+  background:var(--chip);margin-top:7px;max-width:420px}
+.ubar i.act{background:var(--accent)}
+.ubar i.idl{background:var(--warn);opacity:.55}
+.unum{white-space:nowrap}
+.unum b{font-size:19px;font-weight:700}
+.unum span{font-size:13px}
+.ustat{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+
+.statline{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  margin:0 0 12px;padding:0 2px;font-size:14px;color:var(--muted)}
+.statline .n{font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+.statline .n.over{color:var(--bad)}
+.statline>span:nth-child(2){color:var(--ink);font-weight:600}
+.statline .warnb{color:var(--bad);font-weight:600}
+.statline a{text-decoration:none}
+.statline a:hover{color:var(--accent)}
+.summary{margin-bottom:12px;padding:14px 16px}
+.sumline{display:flex;align-items:center;gap:14px}
+.sumnum{display:flex;align-items:baseline;gap:5px;line-height:1}
+.sumnum b{font-size:30px;font-weight:700;letter-spacing:-.02em}
+.sumnum b.over{color:var(--bad)}
+.sumnum span{font-size:16px;color:var(--muted)}
+.sumtxt{min-width:0}
+.sumunit{font-weight:600;font-size:15px}
+.flash{padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:14px}
+.flash.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+.flash.bad{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+button.danger{background:transparent;color:var(--muted);border:1px solid var(--line);padding:4px 10px;font-size:13px}
+button.danger:hover{color:var(--bad);border-color:var(--bad)}
+.doorlist{font-size:14px;line-height:1.7}
+details.otherdoors{margin-top:8px}
+details.otherdoors>summary{font-size:13px;color:var(--muted);cursor:pointer;
+  list-style:none;display:inline-block}
+details.otherdoors>summary::-webkit-details-marker{display:none}
+details.otherdoors>summary::before{content:"\203a ";color:var(--accent)}
+details.otherdoors[open]>summary::before{content:"\2039 "}
+details.otherdoors>summary:hover{color:var(--accent)}
+label.door{display:flex;gap:8px;align-items:center;padding:7px 0;font-size:14px;cursor:pointer}
+input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
+input[type=email],input[type=text],input[type=number]{padding:9px 11px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel);color:var(--ink);font-size:15px;width:100%}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--muted);margin-bottom:5px;font-weight:600}
+details.add{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:0;margin-bottom:14px}
+details.add>summary{padding:14px 16px;cursor:pointer;font-weight:600;list-style:none}
+details.add>summary::-webkit-details-marker{display:none}
+details.add>summary::before{content:"+ ";color:var(--accent)}
+details.add[open]>summary::before{content:"\2212 "}
+details.add .inner{padding:0 16px 16px}
+.bar{height:6px;background:var(--accent);border-radius:3px;display:inline-block;vertical-align:middle}
+/* people list: a list, not a table, so it survives a phone screen */
+ul.people{list-style:none;margin:0;padding:0}
+ul.people li{display:flex;gap:12px;align-items:flex-start;
+  padding:12px 0;border-bottom:1px solid var(--line)}
+ul.people li:last-child{border-bottom:0}
+.who{flex:1 1 auto;min-width:0}                 /* min-width:0 lets text truncate */
+.who .nm{font-weight:600;overflow-wrap:anywhere}
+.who .em{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.who .ds{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.meta{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.meta form{margin:0}
+.acts{display:flex;gap:6px;align-items:center}
+.btnlink{display:inline-block;padding:4px 10px;border:1px solid var(--line);border-radius:8px;
+  font-size:13px;color:var(--muted);text-decoration:none}
+.btnlink:hover{color:var(--accent);border-color:var(--accent)}
+.meta .when{font-size:13px;color:var(--muted);white-space:nowrap;text-align:right}
+.meta .when b{display:block;color:var(--ink);font-weight:600}
+.meta .when .dt{display:block}
+.tags{margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}
+ul.hist{list-style:none;margin:0 0 4px;padding:0}
+ul.hist li{display:flex;gap:12px;align-items:baseline;padding:7px 0;
+  border-bottom:1px solid var(--line);font-size:14px}
+ul.hist li:last-child{border-bottom:0}
+ul.hist .hwhen{flex:0 0 92px;color:var(--muted);font-size:12.5px}
+ul.hist .htext{flex:1 1 auto}
+ul.hist.feed .fev{color:var(--muted)}
+ul.hist .by{color:var(--muted);font-size:13px}
+ul.hist.feed .htext{display:flex;gap:7px;flex-wrap:wrap;align-items:baseline}
+ul.hist li.added .htext::before{content:"+ ";color:var(--ok);font-weight:700}
+ul.hist li.accepted .htext::before{content:"\2713 ";color:var(--ok);font-weight:700}
+ul.hist li.removed .htext::before{content:"\2212 ";color:var(--bad);font-weight:700}
+ul.hist li.edited .htext::before{content:"\2022 ";color:var(--muted);font-weight:700}
+/* Phones: a fixed date column plus wrapping text reads as a jumble. Stack the
+   row instead -- date, then who, then what happened. */
+
+
+.noname{color:var(--muted);font-weight:400;font-style:italic}
+
+/* Wide screens: spread the row across the width instead of leaving a gulf
+   between a left column and a right one. */
+
+/* ---- responsive overrides -------------------------------------------
+   One block per breakpoint, widest first. Rules that must win are the
+   later ones; scattering these across the file is how a phone rule got
+   silently overridden earlier. Keep them here. */
+
+@media (min-width:700px) {
+  ul.people li{align-items:center;padding:10px 0}
+  .who{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
+  .who .nm{flex:0 0 210px}
+  .who .em{flex:0 0 215px}
+  .who .ds{flex:1 1 200px}
+  .tags{margin-top:4px}
+  .meta{flex-direction:row;align-items:center;gap:18px}
+  .meta .when{text-align:right;min-width:150px}
+  .people-head .e{flex:0 0 82px}
+  .meta .when b,.meta .when .dt{display:inline}
+  .meta .when b::after{content:"\00b7";margin:0 6px;color:var(--muted);font-weight:400}
+  ul.people li .meta form{margin:0}
+  #filter{max-width:340px}
+  /* column captions, so the spread-out row reads as a table */
+  .people-head{display:flex;gap:18px;padding:0 0 6px;border-bottom:1px solid var(--line);
+  font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+  .people-head .a{flex:0 0 210px}.people-head .b{flex:0 0 215px}
+  .people-head .c{flex:1 1 200px}.people-head .d{flex:0 0 150px;text-align:right}
+  .people-head .e{flex:0 0 165px}
+}
+
+@media (max-width:699px) {
+  .people-head{display:none}
+}
+
+@media (max-width:640px) {
+  .hide-sm{display:none}.big{font-size:28px}
+}
+
+@media (max-width:560px) {
+  header{padding:6px 12px}
+  /* one compact row: Doorman .................. [hamburger + page name] */
+  .brand small{display:none}               /* the name is on Settings */
+  nav.tabs{display:none}
+  .topacts{display:none}                   /* they live in the menu instead */
+  details.menu{display:block;flex:0 0 auto;min-width:0;position:relative}
+  details.menu nav{position:absolute;left:0;top:100%;z-index:10;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:5px;min-width:190px;box-shadow:0 8px 24px rgba(0,0,0,.14)}
+  .menusep{display:block;height:1px;background:var(--line);margin:5px 2px}
+  details.menu summary{display:flex;align-items:center;gap:9px;
+  padding:6px 4px;font-weight:600;font-size:15px;color:var(--ink)}
+  details.menu summary .burger{font-size:17px;color:var(--muted);line-height:1}
+  details.menu[open] summary .burger{color:var(--accent)}
+  details.menu nav{flex-direction:column;margin:6px 0 4px;gap:1px;overflow:visible}
+  details.menu nav a{padding:10px 12px;border-radius:8px;font-size:15px}
+  details.menu nav a.on{background:var(--accent);color:#fff}
+  .ustat{justify-content:flex-start}
+  ul.hist li{flex-direction:column;align-items:stretch;gap:3px;padding:11px 0}
+  ul.hist .hwhen{flex:none}
+  ul.hist .htext{display:block}
+  ul.hist.feed .htext{display:block}
+  ul.hist.feed .fev{display:block;margin-top:2px}
+  ul.hist .by{display:inline}
+  ul.hist li .htext>.chip{margin-left:6px}
+  .wrap{padding:12px 16px}
+  .signout{width:32px;padding:0}
+  .signout .lbl{display:none}
+  .signout .ico{display:inline}
+
+  ul.people li{flex-wrap:wrap;gap:6px}
+  .who{flex:1 1 100%}
+  .meta{flex:1 1 100%;flex-direction:row;align-items:center;
+  justify-content:space-between;gap:10px}
+  .meta .when{text-align:left}
+  /* one line on a phone, but the two halves must not run together */
+  .meta .when b,.meta .when .dt{display:inline}
+  .meta .when b::after{content:"\00b7";margin:0 6px;color:var(--muted);font-weight:400}
+  .grid{gap:10px}
+  .card{padding:13px}
+}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% block body %}
+<p class="sub" style="margin-top:0">
+  <a href="/person?uid={{ p.UserID }}">&larr; back to {{ name }}</a></p>
+
+<div class="card" style="margin-bottom:12px">
+  <div class="sumunit" style="font-size:17px">{{ name }}</div>
+  <div class="sub mono">{{ p.Username }}</div>
+  {% if gone %}
+  <div class="flash bad" style="margin:10px 0 0">
+    No longer in the site{% if p.RevokedOn %} — removed {{ p.RevokedOn[:10] }}{% endif %}
+    {% if p.RevokedByUserName %} by <span class="mono">{{ p.RevokedByUserName }}</span>{% endif %}.
+    This is the record kept in the audit log; they hold no seat and no door access.
+  </div>
+  {% else %}
+  <div class="sub">{{ p.Description }}</div>
+  {% endif %}
+  {% if invited_by %}
+  <div class="sub" style="margin-top:6px">
+    Added by
+    {% if invited_by.automated %}<b>an automated sync</b>
+      <span class="mono">({{ invited_by.email }})</span>
+    {% else %}<b>{{ invited_by.name }}</b>
+      {% if invited_by.email and invited_by.email != invited_by.name %}
+      <span class="mono">({{ invited_by.email }})</span>{% endif %}
+    {% endif %}
+    {% if invited_on %}on {{ invited_on[:10] }}{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Account history &middot; last {{ hdays }} days</h2>
+  {% if history %}
+  <ul class="hist">
+    {% for h in history %}
+    <li class="{{ h.kind }}">
+      <span class="hwhen mono">{{ h.when[:10] }}</span>
+      <span class="htext">{{ h.text }}{% if h.who %} <span class="by">by {{ h.who }}</span>{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted" style="margin:0">No changes in the last {{ hdays }} days.</p>
+  {% endif %}
+
+  <p style="margin:12px 0 0">
+    <a class="btnlink" href="/history?uid={{ p.UserID }}&amp;hdays={{ more_days }}">
+      Load {{ slice }} more days</a>
+    <span class="sub" style="margin-left:8px">showing back {{ hdays }} days</span>
+  </p>
+  <p class="sub" style="margin-bottom:0">Kindoo records who invited and who removed
+    a person, but not who edited one — those show no name.</p>
+</div>
+{% endblock %}

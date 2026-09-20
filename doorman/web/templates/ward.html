@@ -1,0 +1,132 @@
+{% extends "base.html" %}{% block body %}
+{% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+{% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
+
+{% if not unit %}
+<div class="flash bad">No unit set for you yet — pick one on
+  <a href="/settings">Settings</a>.</div>
+{% endif %}
+
+<div class="statline">
+  <span class="n {{ 'over' if alloc and used>alloc }}">{{ used }}{% if alloc %}/{{ alloc }}{% endif %}</span>
+  <span>{{ unit or "my unit" }}</span>
+  {% if alloc and used>alloc %}<span class="warnb">{{ used-alloc }} over</span>
+  {% elif alloc %}<span class="muted">{{ alloc-used }} left</span>{% endif %}
+  <span class="muted">&middot;</span>
+  <a href="/units" class="muted">site {{ active }}/{{ cap }}</a>
+</div>
+
+<details class="add" {% if err %}open{% endif %}>
+  <summary>Add someone to {{ unit or "my unit" }}</summary>
+  <div class="inner">
+    <form method="post" action="/add">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" name="email" required placeholder="person@example.com">
+      </div>
+      <div class="field">
+        <label>Calling / role</label>
+        <input type="text" name="calling" placeholder="e.g. Treasurer">
+        <div class="sub" style="margin-top:5px">Saved as
+          <span class="mono">{{ unit }} (your text)</span></div>
+      </div>
+      <div class="field">
+        <label>Doors</label>
+        {% if my_doors %}
+          <div class="doorlist">
+            {% for d in my_doors %}<div>{{ d.Name }}</div>{% endfor %}
+          </div>
+          <details class="otherdoors">
+            <summary>Use different doors just this once</summary>
+            <div style="padding-top:6px">
+              {% for d in doors %}
+              <label class="door">
+                <input type="checkbox" name="door_ids" value="{{ d.ID }}"
+                       {{ 'checked' if d.ID in (user.door_ids or []) }}>
+                {{ d.Name }}</label>
+              {% endfor %}
+            </div>
+          </details>
+        {% else %}
+          <div class="flash bad" style="margin:0">
+            No default doors set — choose them on <a href="/settings">Settings</a>,
+            or this person will be added with no access.
+          </div>
+        {% endif %}
+      </div>
+
+      <button type="submit">Add person</button>
+    </form>
+  </div>
+</details>
+
+<div class="card">
+  <h2>{{ rows|length }} {{ 'person' if rows|length==1 else 'people' }}</h2>
+
+  <input type="search" id="filter" placeholder="Filter by name, email or calling"
+         style="margin-bottom:6px" oninput="filterPeople(this.value)">
+
+  <div class="people-head">
+    <span class="a">Name</span><span class="b">Email</span>
+    <span class="c">Calling</span><span class="d">Last door</span><span class="e"></span>
+  </div>
+
+  <ul class="people" id="people">
+    {% for r in rows %}
+    <li data-search="{{ (r.name ~ ' ' ~ r.email ~ ' ' ~ r.desc)|lower }}">
+      <div class="who">
+        <div class="nm"><a class="personlink" href="/person?uid={{ r.uid }}">{% if r.has_name %}{{ r.name }}{% else %}<span class="noname">no name yet</span>{% endif %}</a></div>
+        <div class="em">{{ r.email }}</div>
+        <div class="ds">
+          {{ r.desc }}
+          {% if not r.accepted or r.temp %}
+          <div class="tags">
+            {% if not r.accepted %}<span class="chip bad">invited {{ r.invited_on or '?' }} &middot; not accepted</span>{% endif %}
+            {% if r.temp %}<span class="chip warn">temp {{ (r.expiry or '')[:10] }}</span>{% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="meta">
+        <div class="when">
+          {% if r.last %}<b>{{ r.days }}d ago</b><span class="dt">{{ r.last[:10] }}</span>
+          {% elif r.denied %}<b style="color:var(--bad)">denied</b><span class="dt">tried {{ r.denied_days }}d ago</span>
+          {% else %}<b>never</b><span class="dt">in {{ window }}d</span>{% endif %}
+        </div>
+        <span class="acts">
+        {% if not r.accepted %}
+        <form method="post" action="/resend"
+              onsubmit="return confirm('Have Kindoo email the invitation to {{ r.email }} again?')">
+          <input type="hidden" name="uid" value="{{ r.uid }}">
+          <input type="hidden" name="name" value="{{ r.name }}">
+          <button class="danger" type="submit" title="Send the invitation email again">Resend</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/remove"
+              onsubmit="return confirm('Remove {{ r.name }}? This frees their seat and they lose door access.')">
+          <input type="hidden" name="uid" value="{{ r.uid }}">
+          <input type="hidden" name="name" value="{{ r.name }}">
+          <button class="danger" type="submit">Remove</button>
+        </form>
+        </span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if not rows %}<p class="muted">Nobody matches this unit yet.</p>{% endif %}
+  <p class="sub" id="nomatch" style="display:none">Nothing matches that filter.</p>
+</div>
+
+<script>
+function filterPeople(q){
+  q = (q || "").trim().toLowerCase();
+  var shown = 0;
+  document.querySelectorAll("#people li").forEach(function(li){
+    var hit = !q || li.dataset.search.indexOf(q) !== -1;
+    li.style.display = hit ? "" : "none";
+    if (hit) shown++;
+  });
+  document.getElementById("nomatch").style.display = shown ? "none" : "";
+}
+</script>
+{% endblock %}

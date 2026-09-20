@@ -1,0 +1,68 @@
+{% extends "base.html" %}{% block body %}
+{% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+<form method="post" action="/settings">
+  <div class="card" style="margin-bottom:14px">
+    <h2>Account</h2>
+    <div class="field">
+      <label>Your name</label>
+      <input type="text" name="name" value="{{ user.name or '' }}">
+    </div>
+    <div class="field">
+      <label>Signed in as</label>
+      <div class="mono muted">{{ user.email }}</div>
+    </div>
+    <div class="field">
+      <label>Kindoo session token</label>
+      <input type="password" name="token" placeholder="{{ 'saved — leave blank to keep' if user.token else 'paste your SessionTokenID' }}">
+      <div class="sub" style="margin-top:5px">
+        Yours alone: Kindoo records every action under your name. Get it from a
+        signed-in Kindoo tab — DevTools &rarr; Network &rarr; any
+        <span class="mono">WebService.asmx</span> request &rarr; Request Headers
+        &rarr; <span class="mono">SessionTokenID</span>.
+        Signing out of Kindoo invalidates it.
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <h2>My unit</h2>
+    <div class="field">
+      <select name="unit">
+        <option value="" {{ 'selected' if not user.unit }}>— choose your unit —</option>
+        {% for u in units %}
+        <option value="{{ u }}" {{ 'selected' if u == user.unit }}>{{ u }}</option>
+        {% endfor %}
+      </select>
+      <div class="sub" style="margin-top:5px">People whose description names this
+        unit show up on your main page.
+        {% if not units %}<b>No units are configured yet</b> — they're set in the
+        site config file.{% endif %}</div>
+    </div>
+    <div class="field">
+      <label>Seat allocation</label>
+      <div class="sub" style="margin-top:0">
+        {% if alloc %}<b>{{ alloc }}</b> seats per unit — one figure for the
+          whole site, set in the config file. It's policy, not a preference,
+          so it isn't editable here.
+        {% else %}Not set, so unit usage is shown but not measured against
+          an allocation.{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <h2>Default doors</h2>
+    <p class="sub" style="margin-top:0">Ticked doors are granted automatically when
+      you add someone. You can still change them per person.</p>
+    {% for d in doors %}
+    <label class="door">
+      <input type="checkbox" name="door_ids" value="{{ d.ID }}"
+             {{ 'checked' if d.ID in chosen }}>
+      {{ d.Name }}
+    </label>
+    {% endfor %}
+  </div>
+
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

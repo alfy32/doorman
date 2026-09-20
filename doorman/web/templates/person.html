@@ -1,0 +1,98 @@
+{% extends "base.html" %}{% block body %}
+<p class="sub" style="margin-top:0"><a href="/">&larr; back to {{ user.unit or "my unit" }}</a></p>
+{% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+{% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
+
+<div class="card" style="margin-bottom:12px">
+  <div class="sumunit" style="font-size:17px">{{ name }}</div>
+  <div class="sub mono">{{ p.Username }}</div>
+  <div class="sub">{{ p.Description }}</div>
+  {% if invited_by %}
+  <div class="sub" style="margin-top:6px">
+    Added by
+    {% if invited_by.automated %}<b>an automated sync</b>
+      <span class="mono">({{ invited_by.email }})</span>
+    {% else %}<b>{{ invited_by.name }}</b>
+      {% if invited_by.email and invited_by.email != invited_by.name %}
+      <span class="mono">({{ invited_by.email }})</span>{% endif %}
+    {% endif %}
+    {% if invited_on %}on {{ invited_on[:10] }}{% endif %}
+  </div>
+  {% endif %}
+  <p class="sub" style="margin:8px 0 0">
+    <a class="btnlink" href="/history?uid={{ p.UserID }}">Account history &rarr;</a></p>
+  <div class="tags" style="margin-top:8px">
+    {% if not accepted %}<span class="chip bad">invited {{ (p.InvitedOn or '')[:10] }} &middot; not accepted</span>{% endif %}
+    {% if p.IsTempUser %}<span class="chip warn">temporary</span>{% endif %}
+    <span class="chip ok">{{ ok_count }} opened</span>
+    {% if denied_count %}<span class="chip bad">{{ denied_count }} refused</span>{% endif %}
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:12px">
+  <h2>Doors they can open</h2>
+  {% if can_open %}
+    <div class="doorlist">{% for d in can_open %}<div>{{ d }}</div>{% endfor %}</div>
+    {% if not accepted %}
+    <p class="sub" style="margin-bottom:0">Assigned, but unusable until they accept
+      the invitation.</p>
+    {% endif %}
+  {% else %}
+    <p class="muted" style="margin:0">No doors assigned — they can't get in anywhere.</p>
+  {% endif %}
+
+  {% if scheduled %}
+  <div class="flash bad" style="margin:12px 0 0">
+    This person also has {{ scheduled|length }} scheduled or rule-based
+    permission{{ 's' if scheduled|length != 1 }}. Editing below changes only their
+    always-open doors and leaves those untouched — change them in Kindoo.
+  </div>
+  {% endif %}
+
+  <details class="otherdoors" style="margin-top:10px">
+    <summary>Change their doors</summary>
+    <form method="post" action="/person/doors" style="padding-top:8px">
+      <input type="hidden" name="uid"  value="{{ p.UserID }}">
+      <input type="hidden" name="euid" value="{{ p.EUID }}">
+      <input type="hidden" name="name" value="{{ name }}">
+      {% for d in all_doors %}
+      <label class="door">
+        <input type="checkbox" name="door_ids" value="{{ d.ID }}"
+               {{ 'checked' if d.ID in current_ids }}>
+        {{ d.Name }}</label>
+      {% endfor %}
+      <button type="submit" style="margin-top:10px">Save doors</button>
+      <span class="sub" style="margin-left:10px">Unticking removes access.</span>
+    </form>
+  </details>
+</div>
+
+<div class="card">
+  <h2>Door activity &middot; last {{ ddays }} days</h2>
+  {% if rows %}
+  <ul class="people">
+    {% for l in rows %}
+    <li>
+      <div class="who">
+        <div class="nm" style="font-weight:500">{{ l.DoorName }}</div>
+        {% if not l.Success %}<div class="ds" style="color:var(--bad)">{{ l.ReasonText or 'refused' }}</div>{% endif %}
+      </div>
+      <div class="meta">
+        <div class="when"><b>{{ (l.Timestamp or '')[:10] }}</b><span class="dt">{{ (l.Timestamp or '')[11:16] }}</span></div>
+        {% if l.Success %}<span class="chip ok">opened</span>{% else %}<span class="chip bad">refused</span>{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted" style="margin:0">No door activity in the last {{ ddays }} days.</p>
+  {% endif %}
+
+  <p style="margin:12px 0 0">
+    <a class="btnlink"
+       href="/person?uid={{ p.UserID }}&amp;ddays={{ more_ddays }}&amp;hdays={{ hdays }}">
+      Load {{ slice }} more days</a>
+    <span class="sub" style="margin-left:8px">showing back {{ ddays }} days</span>
+  </p>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Doorman{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css?v={{ css_version() }}">
+</head>
+<body>
+{% set path = request.url.path %}
+{% set page = 'My unit'   if path == '/' else
+              'All units' if path in ('/units', '/unit') else
+              'Changes'   if path == '/changes' else
+              'Settings'  if path == '/settings' else
+              'Person'    if path in ('/person', '/history') else 'Doorman' %}
+{% macro navlinks() %}
+  <a href="/"         class="{{ 'on' if path == '/' }}">My unit</a>
+  <a href="/units"    class="{{ 'on' if path in ('/units','/unit') }}">All units</a>
+  <a href="/changes"  class="{{ 'on' if path == '/changes' }}">Changes</a>
+  <a href="/settings" class="{{ 'on' if path == '/settings' }}">Settings</a>
+{% endmacro %}
+<header><div class="wrap" style="padding:0">
+  <div class="topbar">
+    <div class="brand">Doorman{% if user %} <small>{{ user.name or user.email }}</small>{% endif %}</div>
+    {% if user %}
+    {# Phone: a hamburger. Desktop: plain tabs. Two elements rather than one,
+       because a <details> hides its own content unless open -- trying to reuse
+       it for both left the desktop with no navigation at all. #}
+    <details class="menu">
+      <summary aria-label="Menu"><span class="burger">&#9776;</span><span class="current">{{ page }}</span></summary>
+      <nav>
+        {{ navlinks() }}
+        <span class="menusep"></span>
+        <a href="/refresh?next={{ path }}">&#8635;&nbsp; Refresh</a>
+        <a href="/logout">&#9099;&nbsp; Sign out</a>
+      </nav>
+    </details>
+    <nav class="tabs">{{ navlinks() }}</nav>
+    <div class="topacts">
+      <a href="/refresh?next={{ path }}" class="iconbtn"
+         title="Re-read everything from Kindoo now" aria-label="Refresh">&#8635;</a>
+      <a href="/logout" class="iconbtn signout" title="Sign out" aria-label="Sign out">
+        <span class="lbl">Sign out</span><span class="ico">&#9099;</span></a>
+    </div>
+    {% endif %}
+  </div>
+</div></header>
+<div class="wrap">{% block body %}{% endblock %}</div>
+</body></html>

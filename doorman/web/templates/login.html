@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block body %}
+<div style="max-width:380px;margin:6vh auto">
+  {% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+  {% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
+  <div class="card">
+    <h2>Sign in</h2>
+    <form method="post" action="/login">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" name="email" required autocomplete="username" autofocus>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" name="password" required autocomplete="current-password">
+      </div>
+      <button type="submit" style="width:100%">Sign in</button>
+    </form>
+    <p class="sub" style="margin-bottom:0">
+      <a href="/signup">First time, or forgotten your password?</a>
+      We'll email you a link.
+    </p>
+  </div>
+</div>
+{% endblock %}

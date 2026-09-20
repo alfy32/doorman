@@ -1,0 +1,70 @@
+{
+  "kindoo": {
+    "//eid": "Numeric environment id for your site (EnvironmentID from KindooGetEnvironments).",
+    "eid": 0,
+    "base_url": "https://api.kindoo.tech/v3/webservice.asmx"
+  },
+  "server": {
+    "//host": "127.0.0.1 means this machine only. Change only behind an authenticating proxy.",
+    "host": "127.0.0.1",
+    "port": 8000,
+    "//public_url": "Base URL used in emailed links. Must be reachable by the recipient -- not localhost.",
+    "public_url": "http://localhost:8000"
+  },
+  "//smtp": "Outgoing mail, used to prove someone owns an address before they can set a password. Any relay works -- e.g. Gmail with an App Password. Leave host empty and links are written to the server log instead, which is NOT verification.",
+  "smtp": {
+    "host": "",
+    "port": 587,
+    "username": "",
+    "password": "",
+    "from": ""
+  },
+  "//allowed_emails": "Only these addresses may create an account. Everyone else is refused at sign-up.",
+  "allowed_emails": [
+    "you@example.com"
+  ],
+  "//automated_accounts": "Service accounts that bulk-create users; shown as 'an automated sync' instead of a raw address.",
+  "automated_accounts": [
+    "sync@example.com"
+  ],
+  "//units": "One entry per unit. `name` is required. `town` enables matching a bare town name -- but only where that town has exactly one unit; a town listed by several is never guessed. `write_as` is the exact text used when creating a user, for sites whose real data has odd spacing. `aliases` are other spellings seen in the wild.",
+  "units": [
+    {
+      "name": "Northtown 1st Unit",
+      "town": "Northtown",
+      "write_as": "Northtown  1st Unit",
+      "aliases": [
+        "northtown first unit"
+      ]
+    },
+    {
+      "name": "Northtown 2nd Unit",
+      "town": "Northtown"
+    },
+    {
+      "name": "Southtown Unit",
+      "town": "Southtown"
+    },
+    {
+      "name": "Westville Unit",
+      "town": "Westville"
+    }
+  ],
+  "//users": [
+    "Optional. Seeds accounts on first run so an existing setup keeps working;",
+    "afterwards accounts live in local/doorman.db and are edited in the app.",
+    "Each manager supplies their OWN Kindoo session token on the Settings page."
+  ],
+  "users": {
+    "example": {
+      "name": "Example Manager",
+      "email": "you@example.com",
+      "token": "",
+      "unit": "Northtown 1st Unit",
+      "door_ids": [],
+      "seat_allocation": 20
+    }
+  },
+  "//seat_allocation": "Seats each unit is expected to stay within. One figure for the whole site; 0 means usage isn't measured against one.",
+  "seat_allocation": 20
+}

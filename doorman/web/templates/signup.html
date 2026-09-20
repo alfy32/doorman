@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block body %}
+<div style="max-width:380px;margin:6vh auto">
+  {% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
+  {% if sent %}<div class="flash ok">If that address may use Doorman, a link is
+    on its way — check your email. The link works once and expires.</div>{% endif %}
+  <div class="card">
+    <h2>Get a sign-in link</h2>
+    <p class="sub" style="margin-top:0">
+      Enter your email and we'll send a link to set your password. Only
+      addresses that have been given access will receive one.
+    </p>
+    <form method="post" action="/signup">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" name="email" required autocomplete="username" autofocus>
+      </div>
+      <button type="submit" style="width:100%">Email me a link</button>
+    </form>
+    <p class="sub" style="margin-bottom:0">
+      Already set up? <a href="/login">Sign in</a>.
+    </p>
+  </div>
+</div>
+{% endblock %}
