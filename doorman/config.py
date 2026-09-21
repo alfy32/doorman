@@ -76,7 +76,6 @@ class Settings:
         return self.data.get("allowed_emails") or []
 
     def account(self, email):
-        store.seed_from_config(self.data)
         return store.get_account(email)
 
     def token_for_account(self, account):

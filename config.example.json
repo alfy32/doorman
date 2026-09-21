@@ -19,7 +19,7 @@
     "password": "",
     "from": ""
   },
-  "//allowed_emails": "Only these addresses may create an account. Everyone else is refused at sign-up.",
+  "//allowed_emails": "Only these addresses may create an account. Everyone else is refused at sign-up. Accounts are created by signing up in the app, never here -- passwords and each manager's Kindoo token live in the database, so no credential belongs in this file.",
   "allowed_emails": [
     "you@example.com"
   ],
@@ -50,21 +50,6 @@
       "town": "Westville"
     }
   ],
-  "//users": [
-    "Optional. Seeds accounts on first run so an existing setup keeps working;",
-    "afterwards accounts live in local/doorman.db and are edited in the app.",
-    "Each manager supplies their OWN Kindoo session token on the Settings page."
-  ],
-  "users": {
-    "example": {
-      "name": "Example Manager",
-      "email": "you@example.com",
-      "token": "",
-      "unit": "Northtown 1st Unit",
-      "door_ids": [],
-      "seat_allocation": 20
-    }
-  },
   "//seat_allocation": "Seats each unit is expected to stay within. One figure for the whole site; 0 means usage isn't measured against one.",
   "seat_allocation": 20
 }

@@ -1,8 +1,9 @@
 """Local database (SQLite -- never committed).
 
-Holds Doorman's own accounts and each manager's runtime settings. Site-wide
-reference data (environment id, canonical unit names, and the list of email
-addresses allowed to sign up) stays in config.json, which is hand-edited.
+Holds Doorman's own accounts and each manager's runtime settings, including
+each manager's Kindoo token -- which is why nothing here belongs in a config
+file. Site-wide reference data (environment id, canonical unit names, and the
+list of email addresses allowed to sign up) stays in config.json, hand-edited.
 
 Only this module knows about SQLite; if a server database is ever needed, the
 rest of the app is unaffected.
@@ -37,7 +38,6 @@ CREATE TABLE IF NOT EXISTS accounts (
     token            TEXT NOT NULL DEFAULT '',  -- that person's own Kindoo session token
     unit             TEXT NOT NULL DEFAULT '',
     door_ids         TEXT NOT NULL DEFAULT '[]',
-    seat_allocation  INTEGER NOT NULL DEFAULT 0,
     created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 """
@@ -131,23 +131,3 @@ def purge_verifications(before):
                     (before,))
 
 
-def seed_from_config(cfg):
-    """First run only: pre-create accounts named in config.json so an existing
-    setup keeps working. They still have to choose a password at sign-up."""
-    if list_accounts():
-        return False
-    raw = cfg.get("users") or {}
-    if isinstance(raw, list):
-        raw = {u.get("key") or u.get("name"): u for u in raw}
-    made = False
-    for _, u in (raw or {}).items():
-        email = (u or {}).get("email")
-        if not email:
-            continue
-        create_account(email, (u or {}).get("name") or "")
-        update_account(email, token=(u or {}).get("token") or "",
-                       unit=(u or {}).get("unit") or "",
-                       door_ids=(u or {}).get("door_ids") or [],
-                       seat_allocation=int((u or {}).get("seat_allocation") or 0))
-        made = True
-    return made
