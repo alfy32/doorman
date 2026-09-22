@@ -317,6 +317,10 @@ label.when-opt:has(input:checked){border-color:var(--accent);
   background:color-mix(in srgb,var(--accent) 10%,transparent);
   color:var(--ink);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
 .verdict[hidden]{display:none}
+/* room between what will happen and the button that does it. In the longer
+   form the enclosing .field already provides it; inline on a row there is
+   nothing between them. */
+details.sched .verdict{margin-bottom:12px}
 
 /* a start and an end, not one moment: the roster's separator would read
    "9:54 PM \00b7 until midnight", so this pair keeps its own wording */
