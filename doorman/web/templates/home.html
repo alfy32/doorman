@@ -63,15 +63,6 @@
           <button class="danger" type="submit">End access</button>
         </form>
         {% else %}
-        {% if p.state in ('scheduled', 'due') %}
-        <form method="post" action="/temp/cancel" style="margin-bottom:6px"
-              onsubmit="return confirm('Call off {{ who }} for {{ p.visit.starts_text }}? Nothing was created in Kindoo yet, so there is nothing to undo.')">
-          <input type="hidden" name="visit_id" value="{{ p.visit.id }}">
-          <input type="hidden" name="back" value="/">
-          <button class="danger" type="submit"
-                  title="Call off this booking before it opens">Cancel {{ p.visit.starts_text }}</button>
-        </form>
-        {% endif %}
         {# The common action, and the whole reason this list is here: pick a
            name, pick a length. No form to fill in. #}
         <details class="sched">
@@ -85,6 +76,15 @@
             <a class="sub" href="/temp?edit={{ p.id }}" style="margin-left:10px">Edit their doors</a>
           </form>
         </details>
+        {% if p.state in ('scheduled', 'due') %}
+        <form method="post" action="/temp/cancel"
+              onsubmit="return confirm('Call off {{ who }} for {{ p.visit.starts_text }}? Nothing was created in Kindoo yet, so there is nothing to undo.')">
+          <input type="hidden" name="visit_id" value="{{ p.visit.id }}">
+          <input type="hidden" name="back" value="/">
+          <button class="danger" type="submit"
+                  title="Call off this booking before it opens">Cancel {{ p.visit.starts_text }}</button>
+        </form>
+        {% endif %}
         {% endif %}
       </div>
     </li>
