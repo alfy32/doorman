@@ -123,10 +123,15 @@ also runs the service. `$DOORMAN_DATA_DIR` does the same for the database.
 Day to day:
 
 ```bash
+./deploy/update.sh                 # pull, restart, confirm it came back
 sudo systemctl status doorman      # is it up
-sudo systemctl restart doorman     # after a git pull
 journalctl -u doorman -f           # follow the log
 ```
+
+`update.sh` pulls, reinstalls dependencies only if `requirements.txt` moved,
+restarts, and waits for the port to be listening -- printing the journal
+instead if it did not come back. It says so rather than acting if the unit file
+itself changed, since that needs `install-service.sh` re-run.
 
 Because it stays on `127.0.0.1`, reach it from another machine over SSH rather
 than by changing the bind address:
@@ -147,7 +152,7 @@ doorman/
   web/app.py    routes
   web/static/   stylesheet, served with a content hash for cache-busting
 local/          site config, database, session key (git-ignored)
-deploy/         systemd unit and installer for running it as a service
+deploy/         systemd unit, installer, and update script
 ```
 
 ## Notes on the Kindoo API
