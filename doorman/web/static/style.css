@@ -272,10 +272,23 @@ details.sched>summary::-webkit-details-marker{display:none}
 details.sched>summary:hover{filter:brightness(1.08)}
 details.sched[open]>summary{background:var(--chip);color:var(--muted)}
 details.sched[open]{display:block;width:100%}
-/* an open picker belongs under the whole person, not squeezed beside them */
-ul.people.sched li:has(details.sched[open]){flex-wrap:wrap}
-ul.people.sched li:has(details.sched[open]) .who{flex:1 1 100%}
-ul.people.sched li:has(details.sched[open]) .meta{flex:1 1 100%;align-items:stretch}
+/* An open picker belongs under the whole person, not squeezed beside them.
+   Scoped to any people list, not just the home one: on the manage page the
+   same row also carries Cancel and Forget, and sharing a line with those left
+   the timeframes stacked one per line in a column three words wide. */
+ul.people li:has(details.sched[open]){flex-wrap:wrap}
+ul.people li:has(details.sched[open]) .who{flex:1 1 100%}
+ul.people li:has(details.sched[open]) .meta{flex:1 1 100%;align-items:stretch}
+/* The other buttons drop to their own line rather than crowding the picker.
+   Written against both containers because the two screens nest it differently
+   -- straight into .meta on the home list, inside .acts on the manage page --
+   and on a phone .meta is itself a row, which is what pinned the timeframes
+   into a narrow column there. */
+.meta:has(details.sched[open]),
+.acts:has(details.sched[open]){flex-wrap:wrap}
+details.sched[open]{flex:1 1 100%;order:2}
+.meta:has(details.sched[open])>form,
+.acts:has(details.sched[open])>form{order:1}
 details.sched form{margin-top:10px;padding:12px;border:1px solid var(--line);
   border-radius:10px;background:var(--bg)}
 ul.people.sched li{align-items:flex-start}
