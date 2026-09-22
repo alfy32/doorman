@@ -191,6 +191,33 @@ print("  status now:", v["status"], "| nothing sent to Kindoo:", len(FakeKindoo.
 assert v["status"] == "planned" and len(FakeKindoo.invites) == before
 store.update_temp_visit("me@x.com", v["id"], status="ended")
 
+print("\n--- a future booking can be called off, with nothing to undo ---")
+soon_s = (dt.datetime.now(temps.zone()) + dt.timedelta(days=2)).strftime("%Y-%m-%dT%H:00")
+soon_e = (dt.datetime.now(temps.zone()) + dt.timedelta(days=2, hours=2)).strftime("%Y-%m-%dT%H:00")
+c.post("/temp/new", data={"email": "offagain@x.com", "name": "Off Again", "preset": "range",
+                          "starts": soon_s, "ends": soon_e, "go": "now"}, follow_redirects=False)
+booking = [x for x in store.list_temp_visits("me@x.com") if x["email"] == "offagain@x.com"][0]
+before = len(FakeKindoo.invites), len(FakeKindoo.revoked)
+r = c.post("/temp/cancel", data={"visit_id": booking["id"]}, follow_redirects=False)
+booking = store.get_temp_visit("me@x.com", booking["id"])
+print("  redirect:", r.headers["location"][:80])
+print("  status:", booking["status"], "|", booking["note"])
+assert booking["status"] == "cancelled"
+assert (len(FakeKindoo.invites), len(FakeKindoo.revoked)) == before, "Kindoo must not be touched"
+assert temps.state_of(booking)[0] == "cancelled"
+# and the scheduler must not pick it up when its time comes round
+assert scheduler.run_due(now=temps.parse_utc(booking["starts_at"])) == 0, \
+    "a cancelled booking must never be created"
+print("  scheduler leaves it alone when its time comes")
+
+print("\n--- but a visit already open must be ENDED, not cancelled ---")
+live = [x for x in store.list_temp_visits("me@x.com") if x["status"] == "live"]
+if live:
+    r = c.post("/temp/cancel", data={"visit_id": live[0]["id"]}, follow_redirects=False)
+    print("  refused ->", r.headers["location"][:88])
+    assert "err=" in r.headers["location"]
+    assert store.get_temp_visit("me@x.com", live[0]["id"])["status"] == "live"
+
 print("\n--- a window Kindoo already expired closes itself ---")
 FakeKindoo.users_rows[:] = [u for u in FakeKindoo.users_rows if u["Username"] != "later@x.com"]
 webapp._cache.clear()

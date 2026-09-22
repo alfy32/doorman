@@ -233,6 +233,11 @@ def state_of(row, now=None):
     status = (row.get("status") or "planned")
     start, end = parse_utc(row.get("starts_at")), parse_utc(row.get("ends_at"))
 
+    if status == "cancelled":
+        # Distinct from "ended" on purpose: nothing was ever created, nobody
+        # was ever let in, and no seat was ever spent. Calling that "ended"
+        # would put a non-event in the history looking like an event.
+        return ("cancelled", "cancelled")
     if status == "failed":
         return ("failed", "not created")
     if status == "ended":
@@ -255,7 +260,7 @@ HOLDS_SEAT = {"live", "expiring"}
 def sort_key(row):
     """Live first, then what is coming, then what is over."""
     order = {"expiring": 0, "live": 1, "due": 2, "scheduled": 3,
-             "failed": 4, "missed": 5, "ended": 6}
+             "failed": 4, "missed": 5, "ended": 6, "cancelled": 7}
     key, _ = state_of(row)
     return (order.get(key, 9), row.get("starts_at") or "", row.get("id") or 0)
 

@@ -942,6 +942,36 @@ def requeue_temp(request: Request, visit_id: int = Form(...),
         f"{temps.local_text(visit['starts_at'])}", 303)
 
 
+@app.post("/temp/cancel")
+def cancel_temp(request: Request, visit_id: int = Form(...), back: str = Form("/temp")):
+    """Call off a booking before it opens. Nothing to undo in Kindoo.
+
+    The counterpart to ending one early: a visit that has not started yet has
+    no Kindoo user and holds no seat, so calling it off is purely a change of
+    plan here. One that IS open needs ending instead, which is a different act
+    with a different consequence -- somebody loses access mid-visit -- so this
+    refuses rather than quietly doing it.
+    """
+    owner = me(request).get("email")
+    back = _safe_back(back)
+    visit = store.get_temp_visit(owner, visit_id)
+    if not visit:
+        return RedirectResponse(f"{back}?err=No such visit", 303)
+    state = temps.state_of(visit)[0]
+    if state in temps.HOLDS_SEAT:
+        return RedirectResponse(
+            f"{back}?err={visit['email']} is already in the building — end their "
+            f"access instead", 303)
+    if state in ("ended", "cancelled"):
+        return RedirectResponse(f"{back}?msg=That visit was already over", 303)
+    store.update_temp_visit(owner, visit_id, status="cancelled",
+                            note="called off before it started",
+                            ended_at=temps.to_utc_text(temps.now_utc()))
+    return RedirectResponse(
+        f"{back}?msg=Cancelled {visit['email']} for "
+        f"{temps.local_text(visit['starts_at'])}", 303)
+
+
 @app.post("/temp/end")
 def end_temp(request: Request, visit_id: int = Form(...), back: str = Form("/temp")):
     """End access now instead of waiting for Kindoo to expire it.

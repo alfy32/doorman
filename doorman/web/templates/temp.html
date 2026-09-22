@@ -5,7 +5,7 @@
 {% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
 
 {% set chip = {'live':'ok', 'expiring':'warn', 'due':'warn', 'scheduled':'',
-               'failed':'bad', 'missed':'', 'ended':''} %}
+               'failed':'bad', 'missed':'', 'ended':'', 'cancelled':''} %}
 
 <div class="statline">
   <span class="n">{{ holding }}</span>
@@ -43,6 +43,8 @@
               {% elif p.state == 'scheduled' %}booked for {{ p.visit.starts_text }}
               {% elif p.state == 'due' %}due now &mdash; not created
               {% elif p.state == 'failed' %}last try failed
+              {% elif p.state == 'cancelled' %}last booking cancelled
+              {% elif p.state == 'missed' %}booking passed unused
               {% else %}last in {{ p.visit.ends_text }}{% endif %}
             </span>
             {% else %}<span class="chip">never let in yet</span>{% endif %}
@@ -102,6 +104,13 @@
             <button type="submit">Let {{ who }} in</button>
           </form>
         </details>
+        {% if p.state in ('scheduled', 'due') %}
+        <form method="post" action="/temp/cancel"
+              onsubmit="return confirm('Call off {{ who }} for {{ p.visit.starts_text }}?')">
+          <input type="hidden" name="visit_id" value="{{ p.visit.id }}">
+          <button class="danger" type="submit">Cancel booking</button>
+        </form>
+        {% endif %}
         <form method="post" action="/temp/forget"
               onsubmit="return confirm('Forget {{ who }}? This removes them and their history from Doorman — nothing changes in Kindoo.')">
           <input type="hidden" name="person_id" value="{{ p.id }}">
