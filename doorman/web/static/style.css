@@ -115,6 +115,7 @@ li.mine{background:color-mix(in srgb,var(--accent) 7%,transparent);
 .flash{padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:14px}
 .flash.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
 .flash.bad{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.flash.warn{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)}
 button.danger{background:transparent;color:var(--muted);border-color:var(--line)}
 button.danger:hover{color:var(--bad);border-color:var(--bad)}
 .doorlist{font-size:14px;line-height:1.7}

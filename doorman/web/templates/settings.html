@@ -1,5 +1,8 @@
 {% extends "base.html" %}{% block body %}
 {% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+{% if needs_token %}<div class="flash warn">Doorman can't ask Kindoo anything on your
+  behalf until you paste your own session token below. The rest of the app waits
+  on it, so start here.</div>{% endif %}
 <form method="post" action="/settings">
   <div class="card" style="margin-bottom:14px">
     <h2>Account</h2>
@@ -53,7 +56,9 @@
   <div class="card" style="margin-bottom:14px">
     <h2>Default doors</h2>
     <p class="sub" style="margin-top:0">Ticked doors are granted automatically when
-      you add someone. You can still change them per person.</p>
+      you add someone. You can still change them per person.
+      {% if needs_token %}<b>Your doors are listed here once a token is saved</b> —
+      they come from Kindoo, not from Doorman.{% endif %}</p>
     {% for d in doors %}
     <label class="door">
       <input type="checkbox" name="door_ids" value="{{ d.ID }}"

@@ -256,4 +256,26 @@ r = c.post("/temp/schedule", data={"person_id": person["id"], "preset": "2h",
 print(f"  {'offsite redirect':22} -> {r.headers['location'][:74]}")
 assert r.headers["location"].startswith("/temp"), "must not bounce off-site"
 
+print("\n--- a brand new manager, with no token yet ---")
+# What a first Cloudflare Access sign-in leaves behind: an account and nothing
+# else. Settings must still render, since it is where the token is pasted.
+store.create_account("new@x.com", "New", auth.hash_password("pw"))
+c3 = TestClient(webapp.app)
+c3.post("/login", data={"email": "new@x.com", "password": "pw"}, follow_redirects=False)
+for path in ["/", "/ward", "/temp", "/units", "/changes"]:
+    r = c3.get(path, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/settings", \
+        f"{path} -> {r.status_code} {r.headers.get('location')}"
+print("  every page sends them to Settings, not to an error page")
+body = c3.get("/settings").text
+assert "paste your own session token" in body, "Settings must say what is missing"
+assert "SOUTH DOOR" not in body, "no doors can be listed without a token"
+print("  Settings renders and asks for the token")
+c3.post("/settings", data={"token": "tok3", "unit": UNIT, "name": "New"},
+        follow_redirects=False)
+r = c3.get("/", follow_redirects=False)
+assert r.status_code == 200, f"home still blocked after saving a token: {r.status_code}"
+assert "SOUTH DOOR" in c3.get("/settings").text, "doors appear once the token is in"
+print("  token saved -> the rest of the app opens up")
+
 print("\nALL OK")

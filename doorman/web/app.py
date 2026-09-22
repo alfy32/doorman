@@ -58,18 +58,28 @@ if not _KEY_FILE.exists():
     os.chmod(_KEY_FILE, 0o600)
 PUBLIC_PATHS = {"/login", "/signup", "/logout", "/set-password", "/reset"}
 PUBLIC_PREFIXES = ("/static/",)          # the stylesheet must load on the login page too
+# Every other page asks Kindoo something, so a manager whose account has no
+# token saved has nowhere useful to be. A first sign-in through Cloudflare
+# Access creates the account without one, so this is the normal state for
+# somebody new -- they go to the page that fixes it, not to an error page.
+TOKENLESS_PATHS = {"/settings", "/logout"}
 
 
 @app.middleware("http")
 async def require_login(request: Request, call_next):
-    """Everything needs a signed-in account except the sign-in screens."""
+    """Everything needs a signed-in account except the sign-in screens, and
+    everything but Settings needs that account to have a Kindoo token."""
     path = request.url.path
     if path not in PUBLIC_PATHS and not path.startswith(PUBLIC_PREFIXES):
         email = request.session.get("email")
-        if not email or not store.get_account(email):
-            if not sign_in_via_access(request):
+        acct = store.get_account(email) if email else None
+        if not acct:
+            acct = sign_in_via_access(request)
+            if not acct:
                 request.session.clear()
                 return RedirectResponse("/login", 303)
+        if path not in TOKENLESS_PATHS and not settings.token_for_account(acct):
+            return RedirectResponse("/settings", 303)
     return await call_next(request)
 
 
@@ -1133,17 +1143,23 @@ def changes_page(request: Request, days: int = HISTORY_SLICE, scope: str = "mine
 
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, msg: str = ""):
+    """The one page that has to render without a Kindoo token, since it is
+    where the token gets pasted. No token means no door list -- which is the
+    whole reason to be here -- so the page says so instead of failing."""
     user = me(request)
-    try:
-        doors = cached(request, "doors", client(request).entry_points, ttl=600)
-    except KindooError as e:
-        return templates.TemplateResponse(request, "error.html",
-                                          {"user": user, "err": e}, status_code=503)
+    needs_token = not settings.token_for_account(user)
+    doors = []
+    if not needs_token:
+        try:
+            doors = cached(request, "doors", client(request).entry_points, ttl=600)
+        except KindooError as e:
+            return templates.TemplateResponse(request, "error.html",
+                                              {"user": user, "err": e}, status_code=503)
     chosen = set(user.get("door_ids") or [])
     return templates.TemplateResponse(request, "settings.html", {
         "user": user, "doors": sorted(doors, key=lambda d: d.get("Name") or ""),
         "chosen": chosen, "msg": msg, "units": settings.units,
-        "alloc": settings.seat_allocation})
+        "alloc": settings.seat_allocation, "needs_token": needs_token})
 
 
 @app.post("/settings")

@@ -5,7 +5,8 @@
   {% if err.is_auth %}
     <p>The session token is missing, expired, or was killed by logging out.</p>
     <p class="muted">Log into Kindoo, grab a fresh <span class="mono">SessionTokenID</span>,
-       put it in <span class="mono">.env</span>, and restart.</p>
+       and paste it on <a href="/settings">Settings</a>. It is saved against your
+       account, so nothing needs restarting.</p>
   {% elif err.is_permission %}
     <p>Kindoo refused this call for your role (<span class="mono">NoPermission</span>).</p>
   {% else %}
