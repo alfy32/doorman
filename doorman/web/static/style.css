@@ -71,7 +71,8 @@ form.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-botto
 select,input[type=search]{padding:7px 10px;border:1px solid var(--line);border-radius:8px;
   background:var(--panel);color:var(--ink);font-size:14px}
 button{padding:7px 14px;border:1px solid transparent;border-radius:8px;
-  background:var(--accent);color:#fff;font-size:14px;cursor:pointer}
+  background:var(--accent);color:#fff;font-size:14px;cursor:pointer;
+  font-family:inherit;line-height:1.35}
 a{color:var(--accent)}
 .muted{color:var(--muted)}
 .sorthead{display:flex;align-items:baseline;justify-content:space-between;
@@ -267,7 +268,8 @@ ul.hist li.edited .htext::before{content:"\2022 ";color:var(--muted);font-weight
    timeframe picker, in place. The common action never leaves the list. */
 details.sched>summary{list-style:none;cursor:pointer;display:inline-block;
   padding:7px 14px;border:1px solid transparent;border-radius:8px;
-  background:var(--accent);color:#fff;font-size:14px;white-space:nowrap}
+  background:var(--accent);color:#fff;font-size:14px;white-space:nowrap;
+  line-height:1.35}
 details.sched>summary::-webkit-details-marker{display:none}
 details.sched>summary:hover{filter:brightness(1.08)}
 details.sched[open]>summary{background:var(--chip);color:var(--muted)}
