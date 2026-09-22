@@ -126,6 +126,22 @@ details.otherdoors>summary::-webkit-details-marker{display:none}
 details.otherdoors>summary::before{content:"\203a";color:var(--accent);margin-right:.4em}
 details.otherdoors[open]>summary::before{content:"\2039"}
 details.otherdoors>summary:hover{color:var(--accent)}
+/* The walkthrough for fetching a Kindoo token: folded away, because the
+   managers who have already done it never need to see it again. */
+details.howto{margin-top:7px}
+details.howto>summary{color:var(--accent);cursor:pointer;list-style:none;display:inline-block}
+details.howto>summary::-webkit-details-marker{display:none}
+details.howto>summary::before{content:"\203a";margin-right:.4em}
+details.howto[open]>summary::before{content:"\2039"}
+details.howto p{margin:9px 0;max-width:60ch}
+kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;
+  border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;
+  padding:1px 5px;background:var(--chip);color:var(--ink);white-space:nowrap}
+/* Dragged to the bookmarks bar rather than clicked here, so it is shaped like
+   something to pick up: a button with a grab cursor. */
+a.blet{display:inline-block;padding:7px 13px;border-radius:8px;background:var(--accent);
+  color:#fff;text-decoration:none;font-size:13px;font-weight:600;cursor:grab}
+a.blet:active{cursor:grabbing}
 label.door{display:flex;gap:8px;align-items:center;padding:7px 0;font-size:14px;cursor:pointer}
 input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
 input[type=email],input[type=text],input[type=password],input[type=number],

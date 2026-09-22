@@ -126,8 +126,12 @@ holds only while the edge cannot be bypassed. With it off, nothing changes and
 the password form is the only way in.
 
 Each manager then supplies their **own Kindoo session token** on the Settings
-page. Get one from a signed-in Kindoo tab: DevTools → Network → any
-`WebService.asmx` request → Request Headers → `SessionTokenID`.
+page, which walks them through getting one. Only the web client at
+`web.kindoo.tech` has it -- the phone app does not -- and it is the `Token` key
+in that site's **local storage**. Settings offers a bookmarklet that copies it
+in one click, since a manager who is not a developer should not have to open
+developer tools; the manual route (DevTools -> Application -> Local Storage ->
+`Token`) is written out beside it.
 
 > ⚠️ A token is **password-equivalent** and **not tied to a device** — anyone
 > holding it can open doors. It stays server-side and never reaches the

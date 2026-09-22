@@ -18,11 +18,33 @@
       <label>Kindoo session token</label>
       <input type="password" name="token" placeholder="{{ 'saved — leave blank to keep' if user.token else 'paste your SessionTokenID' }}">
       <div class="sub" style="margin-top:5px">
-        Yours alone: Kindoo records every action under your name. Get it from a
-        signed-in Kindoo tab — DevTools &rarr; Network &rarr; any
-        <span class="mono">WebService.asmx</span> request &rarr; Request Headers
-        &rarr; <span class="mono">SessionTokenID</span>.
-        Signing out of Kindoo invalidates it.
+        Yours alone: Kindoo records every action under your name, so it is as
+        good as your password. Doorman keeps it on the server and never shows
+        it back to you.
+        <details class="howto">
+          <summary>How to get one</summary>
+          <p>Only the <b>web</b> version of Kindoo has it — the phone app does
+            not — so this takes a computer. Sign in at
+            <a href="https://web.kindoo.tech" target="_blank" rel="noopener">web.kindoo.tech</a>
+            and leave that tab open.</p>
+          <p><b>The easy way.</b> Drag this button up onto your bookmarks bar
+            (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> shows the bar if it is
+            hidden). Then, on the Kindoo tab, click it — it copies your token,
+            ready to paste above. Keep it: you will want it again the next time
+            Kindoo signs you out.</p>
+          <p><a class="blet" href="javascript:(function(){var t=localStorage.getItem('Token')||localStorage.getItem('kindoo_token');if(!t){alert('No Kindoo token on this tab. Open web.kindoo.tech, sign in, then click this again.');return}navigator.clipboard.writeText(t).then(function(){alert('Kindoo token copied — paste it into Doorman Settings.')},function(){prompt('Copy this into Doorman Settings:',t)});})()">Copy my Kindoo token</a></p>
+          <p><b>By hand, if you would rather.</b> On the Kindoo tab press
+            <kbd>F12</kbd>, open <b>Application</b> (Firefox calls it
+            <b>Storage</b>), expand <b>Local Storage</b> →
+            <span class="mono">https://web.kindoo.tech</span>, and copy the value
+            next to <span class="mono">Token</span>.</p>
+          <p class="muted">Either way it looks like
+            <span class="mono">3f2504e0-4f89-11d3-9a0c-0305e82c3301</span> — 36
+            characters, four dashes. It keeps working for months, but
+            <b>signing out of Kindoo kills it</b>, so close the tab instead. If
+            Doorman starts saying it cannot reach Kindoo, come back here and
+            paste a fresh one.</p>
+        </details>
       </div>
     </div>
   </div>
