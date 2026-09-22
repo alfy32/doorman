@@ -153,6 +153,44 @@ assert kw["starts"] == want.strftime("%Y-%m-%dT%H:%M:%S"), (kw["starts"], want)
 assert scheduler.run_due(now=soon) == 0, "running twice must not create twice"
 print("  idempotent on a second pass")
 
+print("\n--- \"let in now\" on a future booking moves the start, not just the seat ---")
+# The bug this guards: creating the Kindoo user without moving the start spends
+# a seat today and still refuses them at the door until Thursday.
+booked = (dt.datetime.now(temps.zone()) + dt.timedelta(days=4)).strftime("%Y-%m-%dT%H:00")
+booked_end = (dt.datetime.now(temps.zone()) + dt.timedelta(days=4, hours=3)).strftime("%Y-%m-%dT%H:00")
+c.post("/temp/new", data={"email": "early@x.com", "name": "Early Bird", "preset": "range",
+                          "starts": booked, "ends": booked_end, "go": "now"},
+       follow_redirects=False)
+v = [v for v in store.list_temp_visits("me@x.com") if v["email"] == "early@x.com"][0]
+assert v["status"] == "planned", "a booking four days out must not be created yet"
+was_end = v["ends_at"]
+c.post("/temp/activate", data={"visit_id": v["id"]}, follow_redirects=False)
+email, desc, kw = FakeKindoo.invites[-1]
+v = store.get_temp_visit("me@x.com", v["id"])
+sent_start = dt.datetime.strptime(kw["starts"], "%Y-%m-%dT%H:%M:%S")
+now_local = dt.datetime.now(temps.zone()).replace(tzinfo=None)
+print(f"  booked {booked} to {booked_end} (3 hours, four days out)")
+print(f"  let in now -> Kindoo told start {kw['starts']}, expiry {kw['expiry']}")
+assert sent_start <= now_local, "the door must open NOW, not on the original date"
+assert v["status"] == "live"
+# the LENGTH carries over, not the end: keeping the end would have handed out
+# four days of access for a three-hour booking
+assert v["ends_at"] != was_end, "the end must move with the start"
+got = temps.parse_utc(v["ends_at"]) - temps.parse_utc(v["starts_at"])
+print(f"  length kept: {got} (booked 3:00:00, rounded up to the hour)")
+assert dt.timedelta(hours=3) <= got < dt.timedelta(hours=4), got
+assert temps.parse_utc(v["ends_at"]) < temps.parse_utc(was_end), "must not over-grant"
+
+print("\n--- but a failed future booking can go back in the queue instead ---")
+store.update_temp_visit("me@x.com", v["id"], status="failed", note="pretend it broke",
+                        starts_at=temps.to_utc_text(temps.now_utc() + dt.timedelta(days=2)))
+before = len(FakeKindoo.invites)
+c.post("/temp/requeue", data={"visit_id": v["id"]}, follow_redirects=False)
+v = store.get_temp_visit("me@x.com", v["id"])
+print("  status now:", v["status"], "| nothing sent to Kindoo:", len(FakeKindoo.invites) == before)
+assert v["status"] == "planned" and len(FakeKindoo.invites) == before
+store.update_temp_visit("me@x.com", v["id"], status="ended")
+
 print("\n--- a window Kindoo already expired closes itself ---")
 FakeKindoo.users_rows[:] = [u for u in FakeKindoo.users_rows if u["Username"] != "later@x.com"]
 webapp._cache.clear()

@@ -662,6 +662,10 @@ def _visit_view(row, doors, roster, now=None):
             "state": state, "state_label": label,
             "starts_text": temps.local_text(row.get("starts_at")),
             "ends_text": temps.local_text(row.get("ends_at")),
+            # what "let in now" would actually give them, for the confirmation
+            "now_ends_text": temps.local_text(
+                temps.to_utc_text(temps.brought_forward(row, now)[1])
+                if temps.parse_utc(row.get("ends_at")) else ""),
             "door_names": [by_id.get(i) or f"door {i}" for i in row.get("door_ids") or []],
             "in_kindoo": bool(uid) and uid in roster,
             "holds_seat": state in temps.HOLDS_SEAT}
@@ -880,16 +884,62 @@ def forget_temp_person(request: Request, person_id: int = Form(...)):
 @app.post("/temp/activate")
 def activate_temp(request: Request, visit_id: int = Form(...),
                   back: str = Form("/temp")):
-    """Open a planned window early, ahead of its start."""
+    """Let somebody in now, whatever their booking said.
+
+    The window is **brought forward to this moment**, not merely created. That
+    distinction is the whole point: Kindoo enforces StartAccessDoorsDate itself,
+    so creating Thursday's user today without moving the start spends the seat
+    immediately and still refuses them at the door until Thursday -- the worst
+    of both. Pressing this means "they are here now".
+
+    What carries over is the **length** of the booking, not its end -- see
+    temps.brought_forward. Three hours booked for Thursday is three hours from
+    now, not four days.
+    """
     owner = me(request).get("email")
     back = _safe_back(back)
     visit = store.get_temp_visit(owner, visit_id)
     if not visit:
         return RedirectResponse(f"{back}?err=No such visit", 303)
+
+    now = temps.now_utc()
+    end = temps.parse_utc(visit["ends_at"])
+    if end and now >= end:
+        return RedirectResponse(
+            f"{back}?err=That window has already ended — book them a new one", 303)
+    start, finish = temps.brought_forward(visit, now)
+    if temps.to_utc_text(start) != visit["starts_at"]:
+        visit = store.update_temp_visit(owner, visit_id,
+                                        starts_at=temps.to_utc_text(start),
+                                        ends_at=temps.to_utc_text(finish))
+
     problem = _put_in_kindoo(request, visit)
     if problem:
         return RedirectResponse(f"{back}?err={problem}", 303)
-    return RedirectResponse(f"{back}?msg={visit['email']} is now in Kindoo", 303)
+    return RedirectResponse(
+        f"{back}?msg={visit['email']} can get in now, until "
+        f"{temps.local_text(visit['ends_at'])}", 303)
+
+
+@app.post("/temp/requeue")
+def requeue_temp(request: Request, visit_id: int = Form(...),
+                 back: str = Form("/temp")):
+    """Put a failed visit back in the queue, to be tried again at its own time.
+
+    The counterpart to letting somebody in now: a booking for Thursday that
+    failed should usually be retried *on Thursday*, not dragged into today.
+    Clearing the status is enough -- the scheduler picks up anything planned
+    whose window is about to open.
+    """
+    owner = me(request).get("email")
+    back = _safe_back(back)
+    visit = store.get_temp_visit(owner, visit_id)
+    if not visit:
+        return RedirectResponse(f"{back}?err=No such visit", 303)
+    store.update_temp_visit(owner, visit_id, status="planned", note="")
+    return RedirectResponse(
+        f"{back}?msg={visit['email']} goes back in for "
+        f"{temps.local_text(visit['starts_at'])}", 303)
 
 
 @app.post("/temp/end")

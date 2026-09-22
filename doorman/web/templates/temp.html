@@ -147,11 +147,21 @@
         </div>
         <span class="acts">
           {% if v.state in ('scheduled', 'due', 'failed') %}
-          <form method="post" action="/temp/activate">
+          <form method="post" action="/temp/activate"
+                onsubmit="return confirm('Let {{ v.email }} in right now, until {{ v.now_ends_text or v.ends_text }}?\n\nThey keep the length they were booked for, starting from now.')">
             <input type="hidden" name="visit_id" value="{{ v.id }}">
-            <button type="submit" title="Create them in Kindoo now, taking a seat">
-              {% if v.state == 'failed' %}Try again{% else %}Add now{% endif %}</button>
+            <button type="submit"
+                    title="Bring their start forward to now and put them in Kindoo">
+              Let in now</button>
           </form>
+          {% if v.state == 'failed' %}
+          <form method="post" action="/temp/requeue">
+            <input type="hidden" name="visit_id" value="{{ v.id }}">
+            <button class="danger" type="submit"
+                    title="Leave the booking alone and let the scheduler try again">
+              Try again at its time</button>
+          </form>
+          {% endif %}
           {% endif %}
           {% if v.holds_seat %}
           <form method="post" action="/temp/end"

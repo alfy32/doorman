@@ -190,6 +190,24 @@ def _moment(text, complaint):
     raise WindowError(complaint)
 
 
+def brought_forward(row, now=None):
+    """The window a visit becomes if somebody is let in right now.
+
+    Its **length** is what carries over, not its end. Keeping the end instead
+    would turn a three-hour booking four days out into four days of access the
+    moment anybody pressed "let in now" -- the opposite of what a tool built
+    around a scarce seat should do when asked to be helpful.
+
+    The new end rounds up to the hour like every other window here, and a visit
+    that has already begun is left exactly as it is.
+    """
+    now = now or now_utc()
+    start, end = parse_utc(row.get("starts_at")), parse_utc(row.get("ends_at"))
+    if not start or not end or start <= now:
+        return (start, end)
+    return (now, ceil_hour(now + (end - start)))
+
+
 def description_for(unit, description):
     """The text Kindoo will show, spelled the way the rest of the site spells it.
 
