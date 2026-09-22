@@ -72,7 +72,7 @@ select,input[type=search]{padding:7px 10px;border:1px solid var(--line);border-r
   background:var(--panel);color:var(--ink);font-size:14px}
 button{padding:7px 14px;border:1px solid transparent;border-radius:8px;
   background:var(--accent);color:#fff;font-size:14px;cursor:pointer;
-  font-family:inherit;line-height:1.35}
+  font-family:inherit;line-height:1.35;white-space:nowrap}
 a{color:var(--accent)}
 .muted{color:var(--muted)}
 .sorthead{display:flex;align-items:baseline;justify-content:space-between;
@@ -250,8 +250,10 @@ ul.hist li.edited .htext::before{content:"\2022 ";color:var(--muted);font-weight
 
   ul.people li{flex-wrap:wrap;gap:6px}
   .who{flex:1 1 100%}
+  /* the buttons drop under the dates rather than squeezing them: on a phone
+     there is not room for a window, a Let in now and a Cancel on one line */
   .meta{flex:1 1 100%;flex-direction:row;align-items:center;
-  justify-content:space-between;gap:10px}
+  justify-content:space-between;gap:10px;flex-wrap:wrap}
   .meta .when{text-align:left}
   /* one line on a phone, but the two halves must not run together */
   .meta .when b,.meta .when .dt{display:inline}
