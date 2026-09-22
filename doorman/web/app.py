@@ -73,9 +73,13 @@ async def cache_policy(request: Request, call_next):
 
 # Added last so it wraps require_login: Starlette runs the most recently added
 # middleware outermost, and the auth check needs request.session to exist.
+# Secure cookie whenever the site is actually served over HTTPS, which the
+# public_url tells us: a Secure cookie is never sent over plain HTTP, so
+# setting it unconditionally would break a local http:// install.
 app.add_middleware(SessionMiddleware, secret_key=_KEY_FILE.read_text().strip(),
                    session_cookie="doorman", max_age=60 * 60 * 24 * 30,
-                   same_site="lax")
+                   same_site="lax",
+                   https_only=settings.public_url.startswith("https://"))
 STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
