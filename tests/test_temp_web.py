@@ -29,8 +29,11 @@ class FakeKindoo:
     def __init__(self, *a, **kw): pass
     def environment(self): return {"MaximumUsersLimitNow": 232, "TotalActiveUsers": 230}
     def users(self, *a, **kw): return list(self.users_rows)
-    def entry_points(self): return [{"ID": 6770, "Name": "AXTELL-EAST"},
-                                    {"ID": 6769, "Name": "AXTELL-WEST"}]
+    # Invented doors, not this site's. Nothing identifying belongs in a
+    # public repo -- the real entry points live in the ignored local/ config.
+    def entry_points(self): return [{"ID": 11, "Name": "NORTH DOOR"},
+                                    {"ID": 12, "Name": "SOUTH DOOR"},
+                                    {"ID": 13, "Name": "HALL DOOR"}]
     def access_logs(self, *a, **kw): return []
     def management_logs(self, *a, **kw): return []
     def access_permissions(self, uid): return []
@@ -60,7 +63,7 @@ temps.Kindoo = FakeKindoo
 
 # an account with a unit, doors and a token
 store.create_account("me@x.com", "Me", auth.hash_password("pw"))
-store.update_account("me@x.com", token="tok", unit=UNIT, door_ids=[6770])
+store.update_account("me@x.com", token="tok", unit=UNIT, door_ids=[11])
 
 from fastapi.testclient import TestClient
 c = TestClient(webapp.app)
@@ -96,9 +99,9 @@ print("  invited:", email, "|", desc)
 print("  temp=", kw["temp"], "starts=", kw["starts"], "expiry=", kw["expiry"], "tz=", kw["timezone"])
 assert kw["temp"] is True and kw["timezone"] == "Mountain Standard Time"
 assert not kw["expiry"].endswith("Z"), "a Z on a write is answered with 303 ServerError"
-assert FakeKindoo.grants[-1] == (99, [6770]), FakeKindoo.grants
+assert FakeKindoo.grants[-1] == (99, [11]), FakeKindoo.grants
 person = store.list_temp_people("me@x.com")[0]
-assert person["door_ids"] == [6770], "doors default to the manager's own"
+assert person["door_ids"] == [11], "doors default to the manager's own"
 assert "starts_at" not in person, "the person holds no timeframe"
 print("  person saved with doors", person["door_ids"], "-- and no timeframe on the person")
 
@@ -121,14 +124,14 @@ c.post("/temp/end", data={"visit_id": store.list_temp_visits("me@x.com")[0]["id"
        follow_redirects=False)
 c.post("/temp/edit", data={"person_id": person["id"], "email": "tuner@x.com",
                            "name": "Pat Tuner", "description": "Organ tuner",
-                           "door_ids": ["6769", "6782"]}, follow_redirects=False)
+                           "door_ids": ["12", "13"]}, follow_redirects=False)
 FakeKindoo.users_rows[:] = [u for u in FakeKindoo.users_rows if u["Username"] != "tuner@x.com"]
 webapp._cache.clear()
 c.post("/temp/schedule", data={"person_id": person["id"], "preset": "2h"},
        follow_redirects=False)
 email, desc, kw = FakeKindoo.invites[-1]
 print("  description now:", desc, "| doors now:", FakeKindoo.grants[-1][1])
-assert "Organ tuner" in desc and sorted(FakeKindoo.grants[-1][1]) == [6769, 6782]
+assert "Organ tuner" in desc and sorted(FakeKindoo.grants[-1][1]) == [12, 13]
 
 print("\n--- schedule one for later: nothing sent to Kindoo yet ---")
 before = len(FakeKindoo.invites)
@@ -235,7 +238,7 @@ assert v["status"] == "ended"
 
 print("\n--- another manager sees none of this ---")
 store.create_account("other@x.com", "Other", auth.hash_password("pw"))
-store.update_account("other@x.com", token="tok2", unit=UNIT, door_ids=[6770])
+store.update_account("other@x.com", token="tok2", unit=UNIT, door_ids=[11])
 c2 = TestClient(webapp.app)
 c2.post("/login", data={"email": "other@x.com", "password": "pw"}, follow_redirects=False)
 body = c2.get("/temp").text
