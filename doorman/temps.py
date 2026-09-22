@@ -44,7 +44,6 @@ PRESETS = [
     ("today", "Today",         None),
     ("1w",    "1 week",        dt.timedelta(days=7)),
 ]
-PRESET_LABELS = {k: label for k, label, _ in PRESETS}
 
 
 def zone():
