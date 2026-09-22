@@ -48,7 +48,11 @@
               {% else %}last in {{ p.visit.ends_text }}{% endif %}
             </span>
             {% else %}<span class="chip">never let in yet</span>{% endif %}
-            {% for d in p.door_names %}<span class="chip">{{ d }}</span>{% endfor %}
+            {# Door names are long enough to wrap twice each on a phone and push
+               everything else off the row. The count is all this list needs;
+               which doors they are is one tap away under Edit their details,
+               where they can be changed anyway. #}
+            <span class="chip">{{ p.door_names|length }} door{{ 's' if p.door_names|length != 1 }}</span>
           </div>
 
           <details class="otherdoors" {% if edit == p.id %}open{% endif %}>
