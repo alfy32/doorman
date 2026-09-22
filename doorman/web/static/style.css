@@ -70,8 +70,8 @@ tr:last-child td{border-bottom:0}
 form.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 select,input[type=search]{padding:7px 10px;border:1px solid var(--line);border-radius:8px;
   background:var(--panel);color:var(--ink);font-size:14px}
-button{padding:7px 14px;border:0;border-radius:8px;background:var(--accent);
-  color:#fff;font-size:14px;cursor:pointer}
+button{padding:7px 14px;border:1px solid transparent;border-radius:8px;
+  background:var(--accent);color:#fff;font-size:14px;cursor:pointer}
 a{color:var(--accent)}
 .muted{color:var(--muted)}
 .sorthead{display:flex;align-items:baseline;justify-content:space-between;
@@ -114,7 +114,7 @@ li.mine{background:color-mix(in srgb,var(--accent) 7%,transparent);
 .flash{padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:14px}
 .flash.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
 .flash.bad{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
-button.danger{background:transparent;color:var(--muted);border:1px solid var(--line);padding:4px 10px;font-size:13px}
+button.danger{background:transparent;color:var(--muted);border-color:var(--line)}
 button.danger:hover{color:var(--bad);border-color:var(--bad)}
 .doorlist{font-size:14px;line-height:1.7}
 details.otherdoors{margin-top:8px}
@@ -266,8 +266,8 @@ ul.hist li.edited .htext::before{content:"\2022 ";color:var(--muted);font-weight
 /* "Let in ..." on a person's row: closed it is a button, open it is the
    timeframe picker, in place. The common action never leaves the list. */
 details.sched>summary{list-style:none;cursor:pointer;display:inline-block;
-  padding:6px 13px;border-radius:8px;background:var(--accent);color:#fff;
-  font-size:13px;font-weight:600;white-space:nowrap}
+  padding:7px 14px;border:1px solid transparent;border-radius:8px;
+  background:var(--accent);color:#fff;font-size:14px;white-space:nowrap}
 details.sched>summary::-webkit-details-marker{display:none}
 details.sched>summary:hover{filter:brightness(1.08)}
 details.sched[open]>summary{background:var(--chip);color:var(--muted)}
