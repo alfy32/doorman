@@ -108,6 +108,18 @@ class Kindoo:
         return self.call("KindooSaveAlwaysAccessRight", EID=self.eid, UID=uid,
                          ALL="false", EntryPointIDs=json.dumps(list(entry_point_ids)))
 
+    def edit_description(self, euid, description):
+        """Change the free-text description on a user.
+
+        Takes **EUID**, not UID -- the same person carries both, and this is
+        the endpoint that wants the environment one.
+
+        Kindoo refuses to let a token edit its own user record: that returns
+        303 NoPermission while edits to everyone else succeed.
+        """
+        return self.call("KindooEditEnvironmentUserDescription", EID=self.eid,
+                         EUID=euid, Description=description or "")
+
     def resend_invitation(self, uid, cc_manager=False):
         """Have Kindoo email the invitation again.
 

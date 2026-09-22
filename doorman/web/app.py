@@ -556,6 +556,33 @@ def save_person_doors(request: Request, uid: str = Form(...), euid: str = Form(.
         return RedirectResponse(f"/person?uid={uid}&err=Could not change doors: {e}", 303)
 
 
+@app.post("/person/description")
+def save_person_description(request: Request, uid: str = Form(...),
+                            euid: str = Form(...), name: str = Form(""),
+                            description: str = Form("")):
+    """Change the free-text description Kindoo keeps on a person.
+
+    It is the only field here that is pure annotation -- who someone is, which
+    unit they belong to -- so it is the one most likely to be wrong and worth
+    fixing in place.
+    """
+    description = description.strip()
+    try:
+        client(request).edit_description(euid, description)
+        drop_cache(request)
+        note = (f"Updated the description for {name}" if description
+                else f"Cleared the description for {name}")
+        return RedirectResponse(f"/person?uid={uid}&msg={note}", 303)
+    except KindooError as e:
+        if e.is_permission:
+            # Kindoo enforces no-self-edit on this field.
+            return RedirectResponse(
+                f"/person?uid={uid}&err=Kindoo will not let you edit your own "
+                f"description (NoPermission) — another manager has to do it", 303)
+        return RedirectResponse(
+            f"/person?uid={uid}&err=Could not change the description: {e}", 303)
+
+
 @app.post("/resend")
 def resend_invite(request: Request, uid: str = Form(...), name: str = Form(""),
                   cc: str = Form("")):

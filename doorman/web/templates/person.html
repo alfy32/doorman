@@ -6,7 +6,27 @@
 <div class="card" style="margin-bottom:12px">
   <div class="sumunit" style="font-size:17px">{{ name }}</div>
   <div class="sub mono">{{ p.Username }}</div>
-  <div class="sub">{{ p.Description }}</div>
+  <div class="sub">{{ p.Description or "No description" }}</div>
+  {% if p.Username and user.email and p.Username|lower == user.email|lower %}
+  <p class="sub" style="margin:4px 0 0">Kindoo won't let you edit your own
+    description &mdash; another manager has to.</p>
+  {% else %}
+  <details class="otherdoors" style="margin-top:4px">
+    <summary>Edit description</summary>
+    <form method="post" action="/person/description" style="padding-top:8px">
+      <input type="hidden" name="uid"  value="{{ p.UserID }}">
+      <input type="hidden" name="euid" value="{{ p.EUID }}">
+      <input type="hidden" name="name" value="{{ name }}">
+      <div class="field">
+        <input type="text" name="description" value="{{ p.Description or '' }}"
+               autocomplete="off" autocapitalize="words">
+      </div>
+      <button type="submit">Save description</button>
+      <span class="sub" style="margin-left:10px">Free text &mdash; who they are,
+        which unit.</span>
+    </form>
+  </details>
+  {% endif %}
   {% if invited_by %}
   <div class="sub" style="margin-top:6px">
     Added by
