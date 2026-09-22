@@ -19,7 +19,7 @@
   <a href="/changes"  class="{{ 'on' if path == '/changes' }}">Changes</a>
   <a href="/settings" class="{{ 'on' if path == '/settings' }}">Settings</a>
 {% endmacro %}
-<header><div class="wrap" style="padding:0">
+<header><div class="wrap" style="padding:10px 16px">
   <div class="topbar">
     <div class="brand">Doorman{% if user %} <small>{{ user.name or user.email }}</small>{% endif %}</div>
     {% if user %}
