@@ -19,6 +19,12 @@
     "password": "",
     "from": ""
   },
+  "//access": "Cloudflare Access single sign-on. With this on, a visitor Cloudflare has already authenticated is signed in automatically and never sees Doorman's own password form -- one login instead of two. `team_domain` is <team>.cloudflareaccess.com and `aud` is the Application Audience tag from the Access application. ONLY enable this when the app is unreachable except through Cloudflare (host 127.0.0.1), since it means trusting what the edge says about who is calling.",
+  "access": {
+    "enabled": false,
+    "team_domain": "",
+    "aud": ""
+  },
   "//allowed_emails": "Only these addresses may create an account. Everyone else is refused at sign-up. Accounts are created by signing up in the app, never here -- passwords and each manager's Kindoo token live in the database, so no credential belongs in this file.",
   "allowed_emails": [
     "you@example.com"

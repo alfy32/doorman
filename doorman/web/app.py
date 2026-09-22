@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from .. import auth, mail, store
+from .. import access, auth, mail, store
 from ..config import settings
 from ..kindoo import Kindoo, KindooError
 from ..units import match_unit_fuzzy
@@ -45,8 +45,9 @@ async def require_login(request: Request, call_next):
     if path not in PUBLIC_PATHS and not path.startswith(PUBLIC_PREFIXES):
         email = request.session.get("email")
         if not email or not store.get_account(email):
-            request.session.clear()
-            return RedirectResponse("/login", 303)
+            if not sign_in_via_access(request):
+                request.session.clear()
+                return RedirectResponse("/login", 303)
     return await call_next(request)
 
 
@@ -135,6 +136,30 @@ _cache, TTL = {}, 60
 
 def me(request):
     return store.get_account(request.session.get("email")) or {}
+
+
+def sign_in_via_access(request):
+    """Sign in from a Cloudflare Access token, if one vouches for an address
+    this site allows. Returns the account, or None to fall back to the form.
+
+    An allow-listed address with no account yet gets one: Cloudflare has
+    already proved they own it, which is exactly what sign-up would have
+    established. They still choose their unit and paste their own Kindoo token
+    on Settings.
+    """
+    email = access.verified_email(request, settings.access)
+    if not email:
+        return None
+    acct = store.get_account(email)
+    if not acct:
+        if not auth.is_allowed(email, settings.allowed_emails):
+            log.warning("Cloudflare Access vouched for %s, which is not in "
+                        "allowed_emails -- refusing to create an account", email)
+            return None
+        acct = store.create_account(email)
+        log.info("created an account for %s from a Cloudflare Access sign-in", email)
+    request.session["email"] = acct["email"]
+    return acct
 
 
 def client(request):
@@ -715,6 +740,8 @@ def units_page(request: Request, sort: str = "people"):
 def login_form(request: Request, msg: str = "", err: str = ""):
     if request.session.get("email"):
         return RedirectResponse("/", 303)
+    if sign_in_via_access(request):        # one login, not two
+        return RedirectResponse("/", 303)
     return templates.TemplateResponse(request, "login.html",
                                       {"msg": msg, "err": err, "user": None})
 
@@ -860,4 +887,8 @@ def refresh(request: Request, next: str = "/"):
 @app.get("/logout")
 def logout(request: Request):
     request.session.clear()
-    return RedirectResponse("/login?msg=Signed out", 303)
+    # Clearing only the local session would be theatre: the Access token is
+    # still in the browser, so the next request would sign them straight back
+    # in. Send them to Cloudflare to drop it.
+    away = access.logout_url(settings.access)
+    return RedirectResponse(away or "/login?msg=Signed out", 303)

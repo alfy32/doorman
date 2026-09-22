@@ -119,6 +119,37 @@ In `/etc/doorman/config.json`:
 off the network, and the session cookie is marked `Secure` when it starts with
 `https://`.
 
+## 7. Optional: one login instead of two
+
+By default a visitor authenticates twice -- Cloudflare, then Doorman. Doorman
+can instead trust Cloudflare's signed assertion and sign them in directly.
+
+Take the **Application Audience (AUD) Tag** from the Access application's
+overview page, then in `/etc/doorman/config.json`:
+
+```json
+"access": {
+  "enabled": true,
+  "team_domain": "<team>.cloudflareaccess.com",
+  "aud": "<AUD tag>"
+}
+```
+
+```bash
+./deploy/update.sh
+```
+
+The token is validated properly -- RS256 signature against Cloudflare's
+published keys, plus audience and issuer -- so one minted for a different
+application, or a header someone simply made up, is refused. An allow-listed
+address with no account yet gets one created, because Cloudflare has already
+proved they own it.
+
+**Only enable this with `host` set to `127.0.0.1`.** It trusts the edge's
+account of who is calling, which holds only while the edge cannot be bypassed.
+Signing out redirects to Cloudflare's logout: dropping the local session alone
+would re-authenticate on the very next request.
+
 ## Verifying
 
 From a machine that is *not* signed in:

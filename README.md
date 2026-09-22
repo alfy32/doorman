@@ -75,6 +75,20 @@ links are built from it, so `localhost` will not do.
 > sent. That keeps the app usable before mail is configured, but it is **not**
 > verification — configure SMTP before anyone else signs up.
 
+### One login instead of two
+
+Behind Cloudflare Access (see `deploy/CLOUDFLARE.md`) the edge has already
+proved who the visitor is, so asking for a password again is ceremony. Fill in
+the `access` block and Doorman verifies Cloudflare's signed token -- signature,
+audience and issuer, against Cloudflare's published keys -- and signs that
+person straight in. An allow-listed address with no account yet gets one, since
+owning the address is exactly what sign-up would have proved.
+
+Only turn this on when the app cannot be reached except through Cloudflare
+(`host` on `127.0.0.1`): it trusts the edge's word about who is calling, which
+holds only while the edge cannot be bypassed. With it off, nothing changes and
+the password form is the only way in.
+
 Each manager then supplies their **own Kindoo session token** on the Settings
 page. Get one from a signed-in Kindoo tab: DevTools → Network → any
 `WebService.asmx` request → Request Headers → `SessionTokenID`.

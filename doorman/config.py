@@ -182,6 +182,22 @@ class Settings:
         return bool(e) and any(e == a or e.startswith(a) for a in self.automated_accounts)
 
     @property
+    def access(self):
+        """Cloudflare Access single sign-on, off unless fully configured.
+
+        `aud` is the Application Audience tag from the Access application --
+        it ties a token to this app specifically, so one minted for another
+        application on the same team is refused.
+        """
+        a = self.data.get("access") or {}
+        return {
+            "enabled": bool(a.get("enabled")),
+            "team_domain": str(self._get("DOORMAN_ACCESS_TEAM", "access", "team_domain",
+                                         default="")).strip().strip("/"),
+            "aud": str(self._get("DOORMAN_ACCESS_AUD", "access", "aud", default="")).strip(),
+        }
+
+    @property
     def seat_allocation(self):
         """Seats each unit is expected to stay within.
 
