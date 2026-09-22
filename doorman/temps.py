@@ -1,14 +1,19 @@
 """Temporary people: the access window, and what it costs.
 
-Doorman keeps its own list of temporary people (store.temp_users). A row here is
-a *plan* -- who, which doors, and between which two instants. Whether a matching
-Kindoo user exists is a separate question with three answers over the row's life:
+Doorman keeps its own temporary people (store.temp_people) and, separately, the
+visits it has scheduled for them (store.temp_visits). A person is a saved
+contact -- address, description, doors -- and holds no time at all; a visit is
+one window, and holds no facts about the person. Scheduling somebody again is
+therefore picking them and picking a length, not filling in a form.
+
+A visit passes through three states:
 
     planned -> live -> ended
 
-A seat is consumed the moment the Kindoo user is created, and released when they
-are removed, so creation is deliberately not the same act as writing the plan
-down. A window starting next Tuesday holds no seat until Tuesday.
+Whether a Kindoo user exists is a property of the visit, not the person. A seat
+is consumed the moment that user is created and released when they are removed,
+so creation is deliberately not the same act as writing the plan down: a window
+starting next Tuesday holds no seat until Tuesday.
 
 Times are stored and sent as UTC. They are *typed* in the site's local zone --
 "the rest of today" means local midnight, not UTC midnight, and getting that
@@ -30,8 +35,12 @@ from .kindoo import Kindoo, KindooError
 log = logging.getLogger("doorman.temps")
 
 UTC_FMT = "%Y-%m-%dT%H:%M:%S"
-#: How Kindoo writes an instant: UTC with the Z spelled out.
-API_FMT = "%Y-%m-%dT%H:%M:%SZ"
+#: How Kindoo *accepts* an instant, which is not how it returns one. A write
+#: takes local wall-clock time in ExpiryTimeZone with no zone marker at all,
+#: and the server does the conversion to UTC itself; a read hands the same
+#: value back as UTC with a Z. Sending what it returns earns a bare
+#: "303 ServerError" with nothing to say which field was wrong.
+API_FMT = "%Y-%m-%dT%H:%M:%S"
 
 #: Quick windows, in the order they are offered. `None` means "work it out"
 #: rather than "add this much to now".
@@ -84,7 +93,13 @@ def local_text(text, fmt="%a %-d %b, %-I:%M %p"):
 
 
 def api_text(text, early=None):
-    """A stored UTC stamp in the form Kindoo writes.
+    """A stored UTC stamp as the local wall-clock time Kindoo wants on a write.
+
+    The stamp goes in as the manager's own clock reads it -- 5pm is sent as
+    17:00:00 -- paired with settings.expiry_timezone, which is the same zone
+    named the way C# names it. The two must describe the same place: if
+    site.timezone and kindoo.expiry_timezone ever disagree, every window
+    silently lands hours out.
 
     `early` shifts it back, which is how the promised start becomes a start
     Kindoo will honour a little before the manager said (see LEAD).
@@ -92,7 +107,9 @@ def api_text(text, early=None):
     when = parse_utc(text)
     if not when:
         return ""
-    return (when - early if early else when).strftime(API_FMT)
+    if early:
+        when = when - early
+    return when.astimezone(zone()).strftime(API_FMT)
 
 
 class WindowError(ValueError):
@@ -187,7 +204,7 @@ def description_for(unit, description):
 
 
 def state_of(row, now=None):
-    """What this row actually is right now, as a (key, label) pair.
+    """What one visit actually is right now, as a (key, label) pair.
 
     The stored `status` records what Doorman *did*; the window says where we
     are in time. Both matter: a row still marked live whose end time has passed
@@ -262,7 +279,11 @@ def kindoo_for(owner):
 
 
 def activate(k, owner, row):
-    """Create the Kindoo user for one temporary person. '' on success.
+    """Create the Kindoo user for one visit. '' on success.
+
+    `row` is a visit joined to its person, so the doors and description used
+    are whatever that person's defaults say *now* -- editing someone's doors
+    changes the next visit they are given, which is the point of saving them.
 
     The return value is a sentence for a manager to read, not an exception: a
     refusal here (no seats, address already in the site, a dead token) is
@@ -299,7 +320,7 @@ def activate(k, owner, row):
     except KindooError as e:
         return _failed(owner, row, f"Kindoo refused: {e}")
 
-    store.update_temp_user(owner, row["id"], status="live", note="",
+    store.update_temp_visit(owner, row["id"], status="live", note="",
                            kindoo_uid=str(person.get("UserID") or ""),
                            kindoo_euid=str(person.get("EUID") or ""))
     log.info("temp user %s created in Kindoo for %s until %s",
@@ -308,16 +329,17 @@ def activate(k, owner, row):
 
 
 def _failed(owner, row, message):
-    """Record why a row could not be created, and hand the same words back."""
-    store.update_temp_user(owner, row["id"], status="failed", note=message[:200])
+    """Record why a visit could not be created, and hand the same words back."""
+    store.update_temp_visit(owner, row["id"], status="failed", note=message[:200])
     log.warning("temp user %s for %s failed: %s", row["email"], owner, message)
     return message
 
 
 def end_now(k, owner, row):
-    """Remove the Kindoo user early and close the record. '' on success.
+    """Remove the Kindoo user early and close the visit. '' on success.
 
-    The record stays either way -- it is the history of who was let in.
+    The visit stays either way -- it is the history of who was let in, and the
+    person stays whatever happens, ready to be scheduled again.
     """
     if row.get("kindoo_uid"):
         try:
@@ -326,6 +348,6 @@ def end_now(k, owner, row):
             # Already gone is the outcome we wanted; anything else is not.
             if not e.is_permission:
                 return f"Could not remove them: {e}"
-    store.update_temp_user(owner, row["id"], status="ended", note="ended early",
-                           ended_at=to_utc_text(now_utc()))
+    store.update_temp_visit(owner, row["id"], status="ended", note="ended early",
+                            ended_at=to_utc_text(now_utc()))
     return ""

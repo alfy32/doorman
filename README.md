@@ -10,11 +10,10 @@ A small self-hosted tool for managing door access at a site that uses the
 Each manager looks after the people in their own unit. Doorman gives them the
 three things that job actually needs:
 
-1. **Add someone** — email plus a calling; creates the user and grants the
-   doors that unit uses. This is the home page, since it is what the tool is
-   opened to do.
-2. **Let someone in temporarily** — a visitor who needs a key for two hours,
-   today, a week, or a window you set. See below.
+1. **Let someone in temporarily** — the common one, and the home page: pick a
+   name already on your list, pick a length, done. See below.
+2. **Add someone** — email plus a calling; creates the user and grants the
+   doors that unit uses. They stay until removed.
 3. **See my people** — name, email, calling, and *when they last opened a door*
 4. **Remove someone** — when the shared seat licence gets tight
 
@@ -24,25 +23,32 @@ is sitting idle.
 
 ### Temporary people
 
-A temporary person exists in Doorman before they exist in Kindoo, which is the
-whole point: **a Kindoo seat is consumed the moment the user is created**, so
-Doorman holds the plan and creates them only when their window is about to
-open. A visit booked for next Tuesday costs nothing until Tuesday.
+Two things, kept apart. A temporary **person** is a saved contact — address,
+description, doors — and holds no time at all. A **visit** is one window for one
+of those people, and holds no facts about the person. So letting the piano tuner
+in again is picking their name and picking a length, not filling in a form; and
+editing their doors changes every visit after this one.
+
+A visit exists in Doorman before it exists in Kindoo, which is the whole point:
+**a Kindoo seat is consumed the moment the user is created**, so Doorman holds
+the plan and creates them only when the window is about to open. A visit booked
+for next Tuesday costs nothing until Tuesday.
 
 - Windows run in **whole hours and round up** — asked for two hours at 9:50,
-  somebody gets in until 12:00. The page says what the window comes to before
-  you commit to it, and again in a confirmation.
+  somebody gets in until 12:00. "Today" means the rest of today. The page says
+  what the window comes to before you commit, and again in a confirmation.
 - A window starting **now** goes into Kindoo immediately. One starting **later**
   is created by a background loop (`doorman/scheduler.py`) a few minutes early,
   using that manager's own token, so nobody is left at a locked door at the
-  minute they were promised.
+  minute they were promised. Kindoo's own `StartAccessDoorsDate` gets the same
+  few minutes of margin, because it enforces that gate itself.
 - Nothing is held in memory, so **a restart loses nothing**: each pass asks the
   database which windows are about to open. A start time that passed while the
   app was down is simply due, and goes in on the next pass.
 - Kindoo expires them natively at the end. Doorman notices the removal and
   closes its own record, or you can **end one early** and get the seat back now.
-- The list is **per manager** — each one sees the people they arranged. It keeps
-  rows after the window closes, so it is also the record of who was let in.
+- People and visits are **per manager** — each one sees only their own. Visits
+  are kept after the window closes, so they are also the record of who was let in.
 
 ### Also included
 - **Resend invitation** for anyone who has not accepted theirs
@@ -185,9 +191,9 @@ ssh -L 8000:127.0.0.1:8000 you@server    # then open http://127.0.0.1:8000
 doorman/
   kindoo.py     API client -- owns the protocol quirks (see below)
   units.py      whitespace-tolerant unit-name matching
-  store.py      SQLite: accounts and per-manager settings
+  store.py      SQLite: accounts, settings, temporary people and their visits
   auth.py       sign-up allow-list, password hashing
-  temps.py      temporary people: windows, hour rounding, becoming a Kindoo user
+  temps.py      temporary access: windows, hour rounding, becoming a Kindoo user
   scheduler.py  creates scheduled temporary users just before their window opens
   config.py     loads local/config.json; no secrets or site data in source
   web/app.py    routes

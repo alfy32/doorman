@@ -1,4 +1,6 @@
-{% extends "base.html" %}{% block body %}
+{% extends "base.html" %}
+{% import "_when.html" as when %}
+{% block body %}
 {% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
 {% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
 
@@ -7,6 +9,9 @@
   <a href="/settings">Settings</a>.</div>
 {% endif %}
 
+{% set chip = {'live':'ok', 'expiring':'warn', 'due':'warn', 'scheduled':'',
+               'failed':'bad', 'missed':'', 'ended':''} %}
+
 <div class="statline">
   <span class="n {{ 'over' if alloc and used>alloc }}">{{ used }}{% if alloc %}/{{ alloc }}{% endif %}</span>
   <a href="/ward">{{ unit or "my unit" }}</a>
@@ -14,68 +19,176 @@
   {% elif alloc %}<span class="muted">{{ alloc-used }} left</span>{% endif %}
   <span class="muted">&middot;</span>
   <a href="/units" class="muted">site {{ active }}/{{ cap }}</a>
+  {% if free <= 2 %}<span class="warnb">{{ free }} seat{{ 's' if free != 1 }} free</span>{% endif %}
 </div>
 
 <div class="card">
-  <h2>Add someone to {{ unit or "my unit" }}</h2>
-  <p class="sub" style="margin:-4px 0 12px">They stay until you remove them.
-    Passing through for a day or a week? Make them
-    <a href="/temp">temporary</a> instead, and the seat comes back on its own.</p>
+  <h2>Let someone in temporarily</h2>
 
-  <form method="post" action="/add">
-    <div class="field">
-      <label>Email</label>
-      <input type="email" name="email" required placeholder="person@example.com">
-    </div>
-    <div class="field">
-      <label>Calling / role</label>
-      <input type="text" name="calling" placeholder="e.g. Treasurer">
-      <div class="sub" style="margin-top:5px">Saved as
-        <span class="mono">{{ unit }} (your text)</span></div>
-    </div>
-    <div class="field">
-      <label>Doors</label>
-      {% if my_doors %}
-        <div class="doorlist">
-          {% for d in my_doors %}<div>{{ d.Name }}</div>{% endfor %}
-        </div>
-        <details class="otherdoors">
-          <summary>Use different doors just this once</summary>
-          <div style="padding-top:6px">
-            {% for d in doors %}
-            <label class="door">
-              <input type="checkbox" name="door_ids" value="{{ d.ID }}"
-                     {{ 'checked' if d.ID in (user.door_ids or []) }}>
-              {{ d.Name }}</label>
-            {% endfor %}
+  {% if people %}
+  <ul class="people sched">
+    {% for p in people %}
+    {% set who = p.name or p.email %}
+    <li>
+      <div class="who">
+        <div class="nm">{{ who }}</div>
+        <div class="em">{% if p.name %}{{ p.email }}{% endif %}</div>
+        <div class="ds">
+          {{ p.description or "no description" }}
+          <div class="tags">
+            {% if p.visit %}
+            <span class="chip {{ chip.get(p.state, '') }}">
+              {% if p.state in ('live', 'expiring') %}in the building until {{ p.visit.ends_text }}
+              {% elif p.state == 'scheduled' %}booked for {{ p.visit.starts_text }}
+              {% elif p.state == 'due' %}due now — not created
+              {% elif p.state == 'failed' %}last try failed
+              {% else %}last in {{ p.visit.ends_text }}{% endif %}
+            </span>
+            {% else %}<span class="chip">never let in yet</span>{% endif %}
+            <span class="chip">{{ p.door_names|length }} door{{ 's' if p.door_names|length != 1 }}</span>
           </div>
-        </details>
-      {% else %}
-        <div class="flash bad" style="margin:0">
-          No default doors set — choose them on <a href="/settings">Settings</a>,
-          or this person will be added with no access.
+          {% if p.visit and p.visit.note and p.state == 'failed' %}
+          <div class="sub" style="margin-top:3px">{{ p.visit.note }}</div>{% endif %}
         </div>
-      {% endif %}
+      </div>
+
+      <div class="meta">
+        {% if p.holds_seat %}
+        <form method="post" action="/temp/end"
+              onsubmit="return confirm('End access for {{ who }} now? Their seat comes back immediately.')">
+          <input type="hidden" name="visit_id" value="{{ p.visit.id }}">
+          <input type="hidden" name="back" value="/">
+          <button class="danger" type="submit">End access</button>
+        </form>
+        {% else %}
+        {# The common action, and the whole reason this list is here: pick a
+           name, pick a length. No form to fill in. #}
+        <details class="sched">
+          <summary>Let in &hellip;</summary>
+          <form method="post" action="/temp/schedule"
+                onsubmit="return confirmWhen(this, '{{ who }}')">
+            <input type="hidden" name="person_id" value="{{ p.id }}">
+            <input type="hidden" name="back" value="/">
+            {{ when.picker(presets, previews, today, compact=True) }}
+            <button type="submit">Let {{ who }} in</button>
+            <a class="sub" href="/temp?edit={{ p.id }}" style="margin-left:10px">Edit their doors</a>
+          </form>
+        </details>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted" style="margin:0 0 10px">Nobody saved yet. Add the first person
+    below and they will be one tap away next time.</p>
+  {% endif %}
+
+  <details class="add newtemp" {% if err and not people %}open{% endif %}>
+    <summary>Someone new</summary>
+    <div class="inner">
+      <form method="post" action="/temp/new"
+            onsubmit="return this.go.value === 'save' || confirmWhen(this, this.email.value)">
+        <input type="hidden" name="back" value="/">
+        <div class="tworow">
+          <div class="field">
+            <label>Email</label>
+            <input type="email" name="email" required placeholder="person@example.com">
+          </div>
+          <div class="field">
+            <label>Name <span class="muted" style="text-transform:none">(optional)</span></label>
+            <input type="text" name="name" placeholder="So you know who this is"
+                   autocapitalize="words">
+          </div>
+        </div>
+        <div class="field">
+          <label>Description</label>
+          <input type="text" name="description" placeholder="e.g. Scout leader, piano tuner">
+          <div class="sub" style="margin-top:5px">Saved in Kindoo as
+            <span class="mono">{{ unit }} (your text)</span></div>
+        </div>
+        <div class="field">
+          <label>Doors</label>
+          {% if my_doors %}
+            <div class="doorlist">
+              {% for d in my_doors %}<div>{{ d.Name }}</div>{% endfor %}
+            </div>
+            <details class="otherdoors">
+              <summary>Give them different doors</summary>
+              <div style="padding-top:6px">
+                {% for d in doors %}
+                <label class="door">
+                  <input type="checkbox" name="door_ids" value="{{ d.ID }}"
+                         {{ 'checked' if d.ID in (user.door_ids or []) }}>
+                  {{ d.Name }}</label>
+                {% endfor %}
+              </div>
+            </details>
+          {% else %}
+            <div class="flash bad" style="margin:0">
+              No default doors set — choose them on <a href="/settings">Settings</a>,
+              or this person will be added with no access.
+            </div>
+          {% endif %}
+        </div>
+        <div class="field">
+          <label>How long</label>
+          {{ when.picker(presets, previews, today) }}
+        </div>
+        <button type="submit" name="go" value="now">Add and let in</button>
+        <button type="submit" name="go" value="save" class="danger"
+                style="margin-left:8px">Just save them for later</button>
+      </form>
     </div>
+  </details>
 
-    <button type="submit">Add person</button>
-  </form>
+  <p class="sub" style="margin:12px 0 0">
+    <a href="/temp">Manage temporary people and see every visit &rarr;</a></p>
 </div>
 
-<div class="card altact">
-  <div class="altact-text">
-    <div class="sumunit">Just visiting?</div>
-    <p class="sub" style="margin:2px 0 0">A temporary person gets in for a set
-      window — two hours, a day, a week — and Kindoo takes the seat back at the
-      end.
-      {% if temp_live or temp_soon %}
-        You have
-        {% if temp_live %}<b>{{ temp_live }}</b> in the building now{% endif %}
-        {%- if temp_live and temp_soon %} and {% endif -%}
-        {% if temp_soon %}<b>{{ temp_soon }}</b> coming up{% endif %}.
-      {% endif %}
-    </p>
+<details class="add" style="margin-top:14px">
+  <summary>Add someone permanently</summary>
+  <div class="inner">
+    <p class="sub" style="margin:0 0 10px">They stay until you remove them, and
+      hold a seat the whole time.</p>
+    <form method="post" action="/add">
+      <div class="tworow">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" name="email" required placeholder="person@example.com">
+        </div>
+        <div class="field">
+          <label>Calling / role</label>
+          <input type="text" name="calling" placeholder="e.g. Treasurer">
+        </div>
+      </div>
+      <div class="field">
+        <label>Doors</label>
+        {% if my_doors %}
+          <div class="doorlist">
+            {% for d in my_doors %}<div>{{ d.Name }}</div>{% endfor %}
+          </div>
+          <details class="otherdoors">
+            <summary>Use different doors just this once</summary>
+            <div style="padding-top:6px">
+              {% for d in doors %}
+              <label class="door">
+                <input type="checkbox" name="door_ids" value="{{ d.ID }}"
+                       {{ 'checked' if d.ID in (user.door_ids or []) }}>
+                {{ d.Name }}</label>
+              {% endfor %}
+            </div>
+          </details>
+        {% else %}
+          <div class="flash bad" style="margin:0">
+            No default doors set — choose them on <a href="/settings">Settings</a>.
+          </div>
+        {% endif %}
+      </div>
+      <button type="submit">Add person</button>
+    </form>
   </div>
-  <a class="bigbtn" href="/temp">New temporary user &rarr;</a>
-</div>
+</details>
+
+{{ when.script() }}
 {% endblock %}

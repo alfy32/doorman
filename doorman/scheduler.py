@@ -43,15 +43,15 @@ _task = None
 
 
 def run_due(now=None):
-    """Create every temporary person whose window is about to open.
+    """Create the Kindoo user for every visit whose window is about to open.
 
     Returns the number created. Safe to call at any time and from anywhere:
     activation is driven by each row's stored state, so running it twice in a
     row does nothing the second time.
     """
     now = now or temps.now_utc()
-    rows = store.due_temp_users(temps.to_utc_text(now + temps.LEAD),
-                               temps.to_utc_text(now))
+    rows = store.due_temp_visits(temps.to_utc_text(now + temps.LEAD),
+                                 temps.to_utc_text(now))
     created = 0
     for row in rows:
         owner = row["owner"]
@@ -60,9 +60,9 @@ def run_due(now=None):
             # Their token is gone, so nothing can be created as them. Said
             # once per row rather than every minute: the row is marked failed
             # and shows up on their page with the reason.
-            store.update_temp_user(owner, row["id"], status="failed",
-                                   note="no Kindoo token saved for this manager")
-            log.warning("cannot create temp user %s: %s has no token",
+            store.update_temp_visit(owner, row["id"], status="failed",
+                                    note="no Kindoo token saved for this manager")
+            log.warning("cannot create temp visit for %s: %s has no token",
                         row["email"], owner)
             continue
         problem = temps.activate(k, owner, row)

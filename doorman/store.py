@@ -22,6 +22,9 @@ DB_PATH = DATA_DIR / "doorman.db"
 SCHEMA = """
 -- Superseded by `accounts` when sign-in moved to email + password.
 DROP TABLE IF EXISTS managers;
+-- Superseded by temp_people + temp_visits below, which separate the person
+-- from the window. It existed for a day and held one failed row.
+DROP TABLE IF EXISTS temp_users;
 
 CREATE TABLE IF NOT EXISTS verifications (
     token_hash  TEXT PRIMARY KEY,          -- sha256 of the emailed token
@@ -41,26 +44,42 @@ CREATE TABLE IF NOT EXISTS accounts (
     created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Temporary people, as Doorman remembers them.
+-- Temporary people, and their visits. Two tables, because they are two things.
 --
--- This is OUR list, not a view of Kindoo's. A row may have no Kindoo user at
--- all: one that is still only planned has not been created yet, and one that
--- has expired is gone from the site while the record of it stays here. So
--- `kindoo_uid` is empty far more often than not, and nothing may assume a row
--- can be resolved against the roster.
+-- A temporary PERSON is a saved contact: who they are, what Kindoo should call
+-- them, and which doors they get. That is what a manager keeps and edits -- the
+-- piano tuner is the same piano tuner every time.
 --
--- `owner` is the manager who created it. The list is per manager -- each one
--- sees the temporary people they arranged, not everybody's.
-CREATE TABLE IF NOT EXISTS temp_users (
+-- A VISIT is one window of access for one of those people. It is never part of
+-- the person: the tuner comes for two hours in March and a whole day in June,
+-- and neither of those is a fact about the tuner. Visits are also where the
+-- Kindoo user lives, and most visits have none -- a seat is spent only while a
+-- window is open, so a visit is planned before, and remembered after, any
+-- Kindoo user exists for it.
+--
+-- `owner` scopes both. Each manager keeps their own people and their own
+-- visits, and never sees another manager's.
+CREATE TABLE IF NOT EXISTS temp_people (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    owner        TEXT NOT NULL,             -- account email; scopes the whole list
+    owner        TEXT NOT NULL,             -- account email; scopes the list
     unit         TEXT NOT NULL DEFAULT '',
     email        TEXT NOT NULL DEFAULT '',
-    name         TEXT NOT NULL DEFAULT '',
+    name         TEXT NOT NULL DEFAULT '',  -- for our list; Kindoo has none until they accept
     description  TEXT NOT NULL DEFAULT '',  -- the text Kindoo shows: calling, or why
+    door_ids     TEXT NOT NULL DEFAULT '[]',
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+-- One row per person per manager, so "pick someone from the list" has one
+-- obvious answer and scheduling them twice cannot quietly fork the record.
+CREATE UNIQUE INDEX IF NOT EXISTS temp_people_one_each
+    ON temp_people (owner, email);
+
+CREATE TABLE IF NOT EXISTS temp_visits (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    person_id    INTEGER NOT NULL,
+    owner        TEXT NOT NULL,
     starts_at    TEXT NOT NULL DEFAULT '',  -- UTC isoformat
     ends_at      TEXT NOT NULL DEFAULT '',  -- UTC isoformat
-    door_ids     TEXT NOT NULL DEFAULT '[]',
     kindoo_uid   TEXT NOT NULL DEFAULT '',  -- empty until they exist in Kindoo
     kindoo_euid  TEXT NOT NULL DEFAULT '',
     status       TEXT NOT NULL DEFAULT 'planned',   -- planned|live|ended|failed
@@ -68,7 +87,8 @@ CREATE TABLE IF NOT EXISTS temp_users (
     created_at   TEXT NOT NULL DEFAULT (datetime('now')),
     ended_at     TEXT NOT NULL DEFAULT ''
 );
-CREATE INDEX IF NOT EXISTS temp_users_owner ON temp_users (owner, ends_at);
+CREATE INDEX IF NOT EXISTS temp_visits_owner ON temp_visits (owner, ends_at);
+CREATE INDEX IF NOT EXISTS temp_visits_due ON temp_visits (status, starts_at);
 """
 
 
@@ -162,79 +182,144 @@ def purge_verifications(before):
 
 
 
-# ---- temporary people -----------------------------------------------------
+# ---- temporary people, and their visits -----------------------------------
 # Every read is scoped by owner. Passing the owner in rather than filtering
 # afterwards means a missing scope is a missing argument, not a silent leak of
 # one manager's list into another's.
 
-def _temp_row(r):
+def _json_row(r, *fields):
     d = dict(r)
-    try:
-        d["door_ids"] = json.loads(d.get("door_ids") or "[]")
-    except json.JSONDecodeError:
-        d["door_ids"] = []
+    for f in fields:
+        try:
+            d[f] = json.loads(d.get(f) or "[]")
+        except json.JSONDecodeError:
+            d[f] = []
     return d
 
 
-def _temp_owner(email):
+def _owner(email):
     return (email or "").strip().casefold()
 
 
-def add_temp_user(owner, **fields):
-    fields["owner"] = _temp_owner(owner)
+# -- the people ------------------------------------------------------------
+
+def save_temp_person(owner, email, **fields):
+    """Create or update one saved person, keyed on their address.
+
+    Upsert rather than insert: a manager typing an address they have used
+    before means "this person", not "a second copy of this person".
+    """
+    owner, email = _owner(owner), (email or "").strip()
     if "door_ids" in fields:
         fields["door_ids"] = json.dumps(list(fields["door_ids"]))
-    cols = ", ".join(fields)
-    marks = ", ".join("?" for _ in fields)
     with connect() as con:
-        cur = con.execute(f"INSERT INTO temp_users ({cols}) VALUES ({marks})",
-                          tuple(fields.values()))
-        return cur.lastrowid
+        cur = con.execute(
+            "INSERT INTO temp_people (owner, email) VALUES (?,?) "
+            "ON CONFLICT (owner, email) DO NOTHING", (owner, email))
+        if fields:
+            cols = ", ".join(f"{k} = ?" for k in fields)
+            con.execute(f"UPDATE temp_people SET {cols} WHERE owner = ? AND email = ?",
+                        (*fields.values(), owner, email))
+        r = con.execute("SELECT * FROM temp_people WHERE owner = ? AND email = ?",
+                        (owner, email)).fetchone()
+    return _json_row(r, "door_ids")
 
 
-def list_temp_users(owner):
-    """Newest window first -- what is live or coming up sits at the top."""
+def list_temp_people(owner):
     with connect() as con:
-        return [_temp_row(r) for r in con.execute(
-            "SELECT * FROM temp_users WHERE owner = ? "
-            "ORDER BY ends_at DESC, id DESC", (_temp_owner(owner),))]
+        return [_json_row(r, "door_ids") for r in con.execute(
+            "SELECT * FROM temp_people WHERE owner = ? ORDER BY id DESC", (_owner(owner),))]
 
 
-def get_temp_user(owner, temp_id):
+def get_temp_person(owner, person_id):
     with connect() as con:
-        r = con.execute("SELECT * FROM temp_users WHERE id = ? AND owner = ?",
-                        (temp_id, _temp_owner(owner))).fetchone()
-        return _temp_row(r) if r else None
+        r = con.execute("SELECT * FROM temp_people WHERE id = ? AND owner = ?",
+                        (person_id, _owner(owner))).fetchone()
+        return _json_row(r, "door_ids") if r else None
 
 
-def update_temp_user(owner, temp_id, **fields):
+def update_temp_person(owner, person_id, **fields):
     if not fields:
-        return get_temp_user(owner, temp_id)
+        return get_temp_person(owner, person_id)
     if "door_ids" in fields:
         fields["door_ids"] = json.dumps(list(fields["door_ids"]))
     cols = ", ".join(f"{k} = ?" for k in fields)
     with connect() as con:
-        con.execute(f"UPDATE temp_users SET {cols} WHERE id = ? AND owner = ?",
-                    (*fields.values(), temp_id, _temp_owner(owner)))
-    return get_temp_user(owner, temp_id)
+        con.execute(f"UPDATE temp_people SET {cols} WHERE id = ? AND owner = ?",
+                    (*fields.values(), person_id, _owner(owner)))
+    return get_temp_person(owner, person_id)
 
 
-def delete_temp_user(owner, temp_id):
+def delete_temp_person(owner, person_id):
+    """Forget a person and everything ever scheduled for them."""
     with connect() as con:
-        con.execute("DELETE FROM temp_users WHERE id = ? AND owner = ?",
-                    (temp_id, _temp_owner(owner)))
+        con.execute("DELETE FROM temp_visits WHERE person_id = ? AND owner = ?",
+                    (person_id, _owner(owner)))
+        con.execute("DELETE FROM temp_people WHERE id = ? AND owner = ?",
+                    (person_id, _owner(owner)))
 
 
-def due_temp_users(before, now):
-    """Planned rows whose window is about to open, across ALL owners.
+# -- their visits ----------------------------------------------------------
 
-    The only unscoped read of this table, and deliberately so: the scheduler
+def add_temp_visit(owner, person_id, starts_at, ends_at):
+    with connect() as con:
+        cur = con.execute(
+            "INSERT INTO temp_visits (owner, person_id, starts_at, ends_at) "
+            "VALUES (?,?,?,?)", (_owner(owner), person_id, starts_at, ends_at))
+        return cur.lastrowid
+
+
+def list_temp_visits(owner, person_id=None):
+    """Newest window first. Every row carries its person, because a visit on
+    its own says nothing a manager can read."""
+    sql = ("SELECT v.*, p.email, p.name, p.description, p.door_ids, p.unit "
+           "FROM temp_visits v JOIN temp_people p ON p.id = v.person_id "
+           "WHERE v.owner = ?")
+    args = [_owner(owner)]
+    if person_id is not None:
+        sql += " AND v.person_id = ?"
+        args.append(person_id)
+    with connect() as con:
+        return [_json_row(r, "door_ids")
+                for r in con.execute(sql + " ORDER BY v.ends_at DESC, v.id DESC", args)]
+
+
+def get_temp_visit(owner, visit_id):
+    with connect() as con:
+        r = con.execute(
+            "SELECT v.*, p.email, p.name, p.description, p.door_ids, p.unit "
+            "FROM temp_visits v JOIN temp_people p ON p.id = v.person_id "
+            "WHERE v.id = ? AND v.owner = ?", (visit_id, _owner(owner))).fetchone()
+        return _json_row(r, "door_ids") if r else None
+
+
+def update_temp_visit(owner, visit_id, **fields):
+    if not fields:
+        return get_temp_visit(owner, visit_id)
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    with connect() as con:
+        con.execute(f"UPDATE temp_visits SET {cols} WHERE id = ? AND owner = ?",
+                    (*fields.values(), visit_id, _owner(owner)))
+    return get_temp_visit(owner, visit_id)
+
+
+def delete_temp_visit(owner, visit_id):
+    with connect() as con:
+        con.execute("DELETE FROM temp_visits WHERE id = ? AND owner = ?",
+                    (visit_id, _owner(owner)))
+
+
+def due_temp_visits(before, now):
+    """Planned visits whose window is about to open, across ALL owners.
+
+    The only unscoped read of these tables, and deliberately so: the scheduler
     works on behalf of every manager at once, and each row carries the owner
-    whose token will be used. Rows whose window has already closed are left
-    alone -- creating a user Kindoo would expire on sight spends a seat on
-    nothing.
+    whose token will be used. Windows that have already closed are left alone --
+    creating a user Kindoo would expire on sight spends a seat on nothing.
     """
     with connect() as con:
-        return [_temp_row(r) for r in con.execute(
-            "SELECT * FROM temp_users WHERE status = 'planned' "
-            "AND starts_at <= ? AND ends_at > ? ORDER BY starts_at", (before, now))]
+        return [_json_row(r, "door_ids") for r in con.execute(
+            "SELECT v.*, p.email, p.name, p.description, p.door_ids, p.unit "
+            "FROM temp_visits v JOIN temp_people p ON p.id = v.person_id "
+            "WHERE v.status = 'planned' AND v.starts_at <= ? AND v.ends_at > ? "
+            "ORDER BY v.starts_at", (before, now))]

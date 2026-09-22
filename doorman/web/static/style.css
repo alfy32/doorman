@@ -121,8 +121,8 @@ details.otherdoors{margin-top:8px}
 details.otherdoors>summary{font-size:13px;color:var(--muted);cursor:pointer;
   list-style:none;display:inline-block}
 details.otherdoors>summary::-webkit-details-marker{display:none}
-details.otherdoors>summary::before{content:"\203a ";color:var(--accent)}
-details.otherdoors[open]>summary::before{content:"\2039 "}
+details.otherdoors>summary::before{content:"\203a";color:var(--accent);margin-right:.4em}
+details.otherdoors[open]>summary::before{content:"\2039"}
 details.otherdoors>summary:hover{color:var(--accent)}
 label.door{display:flex;gap:8px;align-items:center;padding:7px 0;font-size:14px;cursor:pointer}
 input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent)}
@@ -135,8 +135,8 @@ input[type=date],input[type=datetime-local]{padding:9px 11px;border:1px solid va
 details.add{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:0;margin-bottom:14px}
 details.add>summary{padding:14px 16px;cursor:pointer;font-weight:600;list-style:none}
 details.add>summary::-webkit-details-marker{display:none}
-details.add>summary::before{content:"+ ";color:var(--accent)}
-details.add[open]>summary::before{content:"\2212 "}
+details.add>summary::before{content:"+";color:var(--accent);margin-right:.4em}
+details.add[open]>summary::before{content:"\2212"}
 details.add .inner{padding:0 16px 16px}
 .bar{height:6px;background:var(--accent);border-radius:3px;display:inline-block;vertical-align:middle}
 /* people list: a list, not a table, so it survives a phone screen */
@@ -263,17 +263,28 @@ ul.hist li.edited .htext::before{content:"\2022 ";color:var(--muted);font-weight
 .brand a{color:inherit;text-decoration:none}
 .brand a:hover{color:var(--accent)}
 
-/* the second way in, sitting under the main form: a card that is mostly a
-   button, so it reads as an alternative rather than another thing to fill in */
-.altact{margin-top:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.altact-text{flex:1 1 260px;min-width:0}
-.bigbtn{flex:0 0 auto;display:inline-block;padding:11px 18px;border-radius:10px;
-  background:var(--accent);color:#fff;text-decoration:none;font-weight:600;font-size:15px}
-.bigbtn:hover{filter:brightness(1.08)}
+/* "Let in ..." on a person's row: closed it is a button, open it is the
+   timeframe picker, in place. The common action never leaves the list. */
+details.sched>summary{list-style:none;cursor:pointer;display:inline-block;
+  padding:6px 13px;border-radius:8px;background:var(--accent);color:#fff;
+  font-size:13px;font-weight:600;white-space:nowrap}
+details.sched>summary::-webkit-details-marker{display:none}
+details.sched>summary:hover{filter:brightness(1.08)}
+details.sched[open]>summary{background:var(--chip);color:var(--muted)}
+details.sched[open]{display:block;width:100%}
+/* an open picker belongs under the whole person, not squeezed beside them */
+ul.people.sched li:has(details.sched[open]){flex-wrap:wrap}
+ul.people.sched li:has(details.sched[open]) .who{flex:1 1 100%}
+ul.people.sched li:has(details.sched[open]) .meta{flex:1 1 100%;align-items:stretch}
+details.sched form{margin-top:10px;padding:12px;border:1px solid var(--line);
+  border-radius:10px;background:var(--bg)}
+ul.people.sched li{align-items:flex-start}
+details.add.newtemp{margin-top:14px;margin-bottom:0}
 
 /* picking a window: the presets read as one row of choices, and the two boxes
    below appear only for the choice that needs them */
 .whenpick{display:flex;flex-wrap:wrap;gap:6px}
+.whenpick.tight label.when-opt{padding:6px 11px;font-size:13.5px}
 label.when-opt{display:inline-flex;align-items:center;gap:7px;cursor:pointer;
   padding:7px 12px;border:1px solid var(--line);border-radius:999px;font-size:14px}
 label.when-opt:hover{border-color:var(--accent)}

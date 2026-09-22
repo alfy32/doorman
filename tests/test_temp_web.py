@@ -38,12 +38,17 @@ class FakeKindoo:
         for u in self.users_rows:
             if u["Username"].casefold() == (email or "").casefold(): return u
         return None
+    next_uid = 99
     def invite_user(self, email, description, **kw):
         FakeKindoo.invites.append((email, description, kw))
-        self.users_rows.append({"UserID": 99, "EUID": 999, "Username": email,
+        # A distinct id per invite, as the real API gives -- reusing one made
+        # revoking somebody look like everybody had vanished from the roster.
+        uid, FakeKindoo.next_uid = FakeKindoo.next_uid, FakeKindoo.next_uid + 1
+        self.users_rows.append({"UserID": uid, "EUID": uid * 10, "Username": email,
                                 "DisplayName": "", "Description": description,
                                 "HasAcceptedInvitation": False, "IsTempUser": True,
                                 "InvitedOn": "2026-09-21T00:00:00Z"})
+        return None
     def grant_always_access(self, uid, ids): FakeKindoo.grants.append((uid, list(ids)))
     def revoke_user(self, uid):
         FakeKindoo.revoked.append(uid)
@@ -74,67 +79,87 @@ for path in ["/", "/ward", "/temp", "/units", "/changes", "/settings",
     print(f"  {path:34} {len(body):6d} bytes")
 
 home = get("/")
-assert "Add someone to" in home and "New temporary user" in home, "home page content"
+assert "Let someone in temporarily" in home, "temp leads the home page"
+assert "Add someone permanently" in home, "the permanent add is still there"
 assert '<div class="brand"><a href="/"' in home, "brand links home"
-assert "Add someone to" not in get("/ward"), "add form should have left the roster"
-print("home page + brand link ok")
+assert "Add someone to" not in get("/ward"), "the add form should have left the roster"
+print("home page leads with temporary access, brand links home")
 
-print("\n--- create a temp user for right now ---")
-r = c.post("/temp", data={"email": "visitor@x.com", "name": "Pat Visitor",
-                          "description": "Piano tuner", "preset": "2h"},
-           follow_redirects=False)
-print("  redirect:", r.headers["location"][:90])
-assert FakeKindoo.invites, "should have been created in Kindoo immediately"
+print("\n--- someone new: saved as a person, and let in for 2 hours ---")
+r = c.post("/temp/new", data={"email": "tuner@x.com", "name": "Pat Tuner",
+                              "description": "Piano tuner", "preset": "2h",
+                              "back": "/", "go": "now"}, follow_redirects=False)
+print("  redirect:", r.headers["location"][:88])
+assert FakeKindoo.invites, "a window starting now goes into Kindoo immediately"
 email, desc, kw = FakeKindoo.invites[-1]
 print("  invited:", email, "|", desc)
 print("  temp=", kw["temp"], "starts=", kw["starts"], "expiry=", kw["expiry"], "tz=", kw["timezone"])
 assert kw["temp"] is True and kw["timezone"] == "Mountain Standard Time"
+assert not kw["expiry"].endswith("Z"), "a Z on a write is answered with 303 ServerError"
 assert FakeKindoo.grants[-1] == (99, [6770]), FakeKindoo.grants
+person = store.list_temp_people("me@x.com")[0]
+assert person["door_ids"] == [6770], "doors default to the manager's own"
+assert "starts_at" not in person, "the person holds no timeframe"
+print("  person saved with doors", person["door_ids"], "-- and no timeframe on the person")
+
+print("\n--- the common case: pick that person again, pick a length ---")
 body = get("/temp")
-assert "in Kindoo now" in body and "Pat Visitor" in body
-print("  list shows them live, with the manager's default door")
+# they are live, so their row offers the way out rather than the way in
+assert "Pat Tuner" in body and "End access" in body
+r = c.post("/temp/end", data={"visit_id": store.list_temp_visits("me@x.com")[0]["id"],
+                              "back": "/"}, follow_redirects=False)
+before = len(FakeKindoo.invites)
+r = c.post("/temp/schedule", data={"person_id": person["id"], "preset": "today",
+                                   "back": "/"}, follow_redirects=False)
+print("  redirect:", r.headers["location"][:88])
+assert len(FakeKindoo.invites) == before + 1, "scheduling an existing person re-invites them"
+assert len(store.list_temp_people("me@x.com")) == 1, "and does not duplicate the person"
+print("  visits so far:", [(v["email"], v["status"]) for v in store.list_temp_visits("me@x.com")])
+
+print("\n--- editing their defaults changes the NEXT visit ---")
+c.post("/temp/end", data={"visit_id": store.list_temp_visits("me@x.com")[0]["id"]},
+       follow_redirects=False)
+c.post("/temp/edit", data={"person_id": person["id"], "email": "tuner@x.com",
+                           "name": "Pat Tuner", "description": "Organ tuner",
+                           "door_ids": ["6769", "6782"]}, follow_redirects=False)
+FakeKindoo.users_rows[:] = [u for u in FakeKindoo.users_rows if u["Username"] != "tuner@x.com"]
+webapp._cache.clear()
+c.post("/temp/schedule", data={"person_id": person["id"], "preset": "2h"},
+       follow_redirects=False)
+email, desc, kw = FakeKindoo.invites[-1]
+print("  description now:", desc, "| doors now:", FakeKindoo.grants[-1][1])
+assert "Organ tuner" in desc and sorted(FakeKindoo.grants[-1][1]) == [6769, 6782]
 
 print("\n--- schedule one for later: nothing sent to Kindoo yet ---")
 before = len(FakeKindoo.invites)
-later = (dt.datetime.now(temps.zone()) + dt.timedelta(days=3)).strftime("%Y-%m-%dT%H:%M")
-end = (dt.datetime.now(temps.zone()) + dt.timedelta(days=3, hours=4)).strftime("%Y-%m-%dT%H:%M")
-r = c.post("/temp", data={"email": "later@x.com", "preset": "range",
-                          "starts": later, "ends": end}, follow_redirects=False)
-print("  redirect:", r.headers["location"][:90])
+later = (dt.datetime.now(temps.zone()) + dt.timedelta(days=3)).strftime("%Y-%m-%dT%H:00")
+end = (dt.datetime.now(temps.zone()) + dt.timedelta(days=3, hours=4)).strftime("%Y-%m-%dT%H:00")
+c.post("/temp/new", data={"email": "later@x.com", "preset": "range", "starts": later,
+                          "ends": end, "go": "now"}, follow_redirects=False)
 assert len(FakeKindoo.invites) == before, "must NOT take a seat three days early"
-assert "starts later" in get("/temp")
+assert "booked for" in get("/temp")
 print("  held as a plan, no seat taken")
 
 print("\n--- the scheduler creates it when the window comes near ---")
 from doorman import scheduler
-row = [r for r in store.list_temp_users("me@x.com") if r["email"] == "later@x.com"][0]
-soon = temps.parse_utc(row["starts_at"]) - dt.timedelta(minutes=5)   # inside the lead
-print("  created:", scheduler.run_due(now=soon), "user(s)")
+visit = [v for v in store.list_temp_visits("me@x.com") if v["email"] == "later@x.com"][0]
+soon = temps.parse_utc(visit["starts_at"]) - dt.timedelta(minutes=5)
+print("  created:", scheduler.run_due(now=soon), "visit(s)")
 assert len(FakeKindoo.invites) == before + 1
 email, desc, kw = FakeKindoo.invites[-1]
-promised, sent = row["starts_at"], kw["starts"]
-print(f"  promised start {promised}Z -> told Kindoo {sent}")
-assert temps.parse_utc(sent[:19]) == temps.parse_utc(promised) - temps.LEAD, "10 min of margin"
+want = (temps.parse_utc(visit["starts_at"]) - temps.LEAD).astimezone(temps.zone())
+print(f"  promised {visit['starts_at']}Z -> told Kindoo {kw['starts']} ({temps.settings.expiry_timezone})")
+assert kw["starts"] == want.strftime("%Y-%m-%dT%H:%M:%S"), (kw["starts"], want)
 assert scheduler.run_due(now=soon) == 0, "running twice must not create twice"
 print("  idempotent on a second pass")
 
-print("\n--- ending early gives the seat straight back ---")
-row = [r for r in store.list_temp_users("me@x.com") if r["email"] == "visitor@x.com"][0]
-c.post("/temp/end", data={"temp_id": row["id"]}, follow_redirects=False)
-assert "99" in [str(x) for x in FakeKindoo.revoked], FakeKindoo.revoked
-body = get("/temp")
-assert "Ended access for visitor@x.com" in body or "ended" in body
-print("  revoked in Kindoo, record kept:",
-      [(r["email"], r["status"]) for r in store.list_temp_users("me@x.com")])
-
 print("\n--- a window Kindoo already expired closes itself ---")
-row = [r for r in store.list_temp_users("me@x.com") if r["email"] == "later@x.com"][0]
 FakeKindoo.users_rows[:] = [u for u in FakeKindoo.users_rows if u["Username"] != "later@x.com"]
 webapp._cache.clear()
 get("/temp")
-print("  after reconcile:", [(r["email"], r["status"], r["note"])
-                             for r in store.list_temp_users("me@x.com")])
-assert store.get_temp_user("me@x.com", row["id"])["status"] == "ended"
+v = [v for v in store.list_temp_visits("me@x.com") if v["email"] == "later@x.com"][0]
+print("  after reconcile:", v["status"], "|", v["note"])
+assert v["status"] == "ended"
 
 print("\n--- another manager sees none of this ---")
 store.create_account("other@x.com", "Other", auth.hash_password("pw"))
@@ -142,14 +167,18 @@ store.update_account("other@x.com", token="tok2", unit=UNIT, door_ids=[6770])
 c2 = TestClient(webapp.app)
 c2.post("/login", data={"email": "other@x.com", "password": "pw"}, follow_redirects=False)
 body = c2.get("/temp").text
-assert "visitor@x.com" not in body and "later@x.com" not in body, "leaked another manager's list"
-print("  other manager's page is empty:", "Nobody yet" in body)
+assert "tuner@x.com" not in body and "later@x.com" not in body, "leaked another manager's list"
+print("  other manager's page is empty:", "Nobody saved yet" in body)
 
 print("\n--- bad input is refused, not crashed ---")
-for data, why in [({"email": "x@x.com", "preset": "range", "starts": "", "ends": ""}, "no times"),
-                  ({"email": "x@x.com", "preset": "day", "day": "2020-01-01"}, "past day"),
-                  ({"email": "existing@x.com", "preset": "2h"}, "already in the site")]:
-    r = c.post("/temp", data=data, follow_redirects=False)
-    print(f"  {why:22} -> {r.headers['location'][:78]}")
+for data, why in [({"person_id": person["id"], "preset": "range"}, "no times"),
+                  ({"person_id": person["id"], "preset": "day", "day": "2020-01-01"}, "past day"),
+                  ({"person_id": 99999, "preset": "2h"}, "someone else's person")]:
+    r = c.post("/temp/schedule", data=data, follow_redirects=False)
+    print(f"  {why:22} -> {r.headers['location'][:74]}")
+r = c.post("/temp/schedule", data={"person_id": person["id"], "preset": "2h",
+                                   "back": "https://evil.example/x"}, follow_redirects=False)
+print(f"  {'offsite redirect':22} -> {r.headers['location'][:74]}")
+assert r.headers["location"].startswith("/temp"), "must not bounce off-site"
 
 print("\nALL OK")

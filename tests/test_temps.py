@@ -56,10 +56,12 @@ a, b = temps.window("range", starts="2026-10-04T17:00", ends="2026-10-04T21:00",
 print("range ", temps.local_text(temps.to_utc_text(a)), "->", temps.local_text(temps.to_utc_text(b)))
 assert temps.local_text(temps.to_utc_text(a), "%H:%M") == "17:00"
 
-# the Kindoo-facing start is LEAD earlier than the promised one
+# Kindoo is sent LOCAL wall-clock time with no zone marker (it converts using
+# ExpiryTimeZone), and the start it is given is LEAD earlier than the promised one
 promised = temps.to_utc_text(a)
 print("promised start:", temps.api_text(promised), " sent to Kindoo:", temps.api_text(promised, early=temps.LEAD))
-assert temps.api_text(promised, early=temps.LEAD) == "2026-10-04T22:50:00Z"
+assert temps.api_text(promised) == "2026-10-04T17:00:00", temps.api_text(promised)
+assert temps.api_text(promised, early=temps.LEAD) == "2026-10-04T16:50:00"
 
 for bad, why in [(("range",), "no times"), (("nonsense",), "unknown preset")]:
     try:
@@ -85,25 +87,49 @@ for label, r in [("planned, future", row("planned", soon, later)),
                  ("failed",          row("failed", soon, later))]:
     print(f"  {label:16} -> {temps.state_of(r, now)}")
 
-# ---- storage is per manager ----
-a_id = store.add_temp_user("A@x.com", email="one@x.com", starts_at=soon, ends_at=later,
-                           door_ids=[1, 2], description="Scout leader", unit="U")
-b_id = store.add_temp_user("b@x.com", email="two@x.com", starts_at=soon, ends_at=later)
-print("A sees:", [r["email"] for r in store.list_temp_users("a@x.com")])
-print("B sees:", [r["email"] for r in store.list_temp_users("b@x.com")])
-assert store.get_temp_user("b@x.com", a_id) is None, "must not read another manager's row"
-assert store.get_temp_user("a@x.com", a_id)["door_ids"] == [1, 2]
-store.update_temp_user("b@x.com", a_id, status="ended")
-assert store.get_temp_user("a@x.com", a_id)["status"] == "planned", "must not write another's row"
+# ---- storage: people and visits are separate, and both are per manager ----
+alice = store.save_temp_person("A@x.com", "one@x.com", name="One", unit="U",
+                               description="Scout leader", door_ids=[1, 2])
+bob = store.save_temp_person("b@x.com", "two@x.com", name="Two")
+print("A sees:", [p["email"] for p in store.list_temp_people("a@x.com")])
+print("B sees:", [p["email"] for p in store.list_temp_people("b@x.com")])
+assert store.get_temp_person("b@x.com", alice["id"]) is None, "must not read another manager's person"
+assert store.get_temp_person("a@x.com", alice["id"])["door_ids"] == [1, 2]
+store.update_temp_person("b@x.com", alice["id"], description="hijacked")
+assert store.get_temp_person("a@x.com", alice["id"])["description"] == "Scout leader", \
+    "must not write another manager's person"
 print("scoping ok")
 
+# the same address twice is the same person, not a second copy
+again = store.save_temp_person("a@x.com", "one@x.com", description="Piano tuner")
+assert again["id"] == alice["id"], "an address already saved must not fork"
+assert again["door_ids"] == [1, 2], "an update must not wipe what it did not touch"
+assert len(store.list_temp_people("a@x.com")) == 1
+print("re-saving the same address edits the one record:", again["description"])
+
+# a visit holds the window; the person holds nothing about time
+v1 = store.add_temp_visit("a@x.com", alice["id"], soon, later)
+visit = store.get_temp_visit("a@x.com", v1)
+assert visit["email"] == "one@x.com" and visit["description"] == "Piano tuner", \
+    "a visit must carry its person"
+assert "starts_at" not in store.get_temp_person("a@x.com", alice["id"])
+print("visit", v1, "->", visit["email"], visit["starts_at"], "to", visit["ends_at"])
+store.add_temp_visit("b@x.com", bob["id"], soon, later)
+assert [v["id"] for v in store.list_temp_visits("b@x.com")] != [v1]
+print("visits are scoped too")
+
 # ---- the scheduler picks the right rows ----
-due = store.due_temp_users(temps.to_utc_text(now + temps.LEAD), temps.to_utc_text(now))
+due = store.due_temp_visits(temps.to_utc_text(now + temps.LEAD), temps.to_utc_text(now))
 print("due right now:", [r["email"] for r in due], "(none expected: both start in an hour)")
-due = store.due_temp_users(temps.to_utc_text(now + dt.timedelta(hours=2)), temps.to_utc_text(now))
+due = store.due_temp_visits(temps.to_utc_text(now + dt.timedelta(hours=2)), temps.to_utc_text(now))
 print("due within 2h:", sorted(r["email"] for r in due))
-store.add_temp_user("a@x.com", email="over@x.com", starts_at=past1, ends_at=past2)
-due = store.due_temp_users(temps.to_utc_text(now + dt.timedelta(hours=2)), temps.to_utc_text(now))
-assert "over@x.com" not in [r["email"] for r in due], "a window already closed must not be created"
+store.add_temp_visit("a@x.com", alice["id"], past1, past2)
+due = store.due_temp_visits(temps.to_utc_text(now + dt.timedelta(hours=2)), temps.to_utc_text(now))
+assert past1 not in [r["starts_at"] for r in due], "a window already closed must not be created"
 print("closed window skipped ok")
+
+# forgetting a person takes their visits with them
+store.delete_temp_person("a@x.com", alice["id"])
+assert not store.list_temp_people("a@x.com") and not store.list_temp_visits("a@x.com")
+print("forgetting a person clears their visits too")
 print("\nALL OK")

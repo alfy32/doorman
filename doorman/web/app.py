@@ -376,36 +376,27 @@ def _rows_for(people, last, denied=None):
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request, msg: str = "", err: str = ""):
-    """Home: putting somebody in the building is what Doorman is opened to do.
+    """Home: letting somebody in, in the order it actually happens.
 
-    The roster moved to /ward when this became the front page. What is left is
-    the two ways in -- a permanent person, or a temporary one -- above the seat
-    count that decides whether either is a good idea today.
+    Temporary access leads, because it is the common action and the common
+    shape of it is small -- pick a name already in the list, pick a length.
+    A brand new temporary person is next, and adding somebody permanently,
+    the rarest of the three, sits collapsed at the bottom. The roster moved
+    to /ward when this became the front page.
     """
     user = me(request)
     unit = user.get("unit") or ""
     try:
-        k = client(request)
-        env = cached(request, "env", k.environment)
-        users = cached(request, "users", k.users)
-        doors = cached(request, "doors", k.entry_points, ttl=600)
+        ctx = _temp_context(request, user)
+        users = cached(request, "users", client(request).users)
     except KindooError as e:
         return templates.TemplateResponse(request, "error.html",
                                           {"user": user, "err": e}, status_code=503)
-    my_doors = [d for d in doors if d.get("ID") in set(user.get("door_ids") or [])]
-    mine = store.list_temp_users(user.get("email"))
-    states = [temps.state_of(t)[0] for t in mine]
     return templates.TemplateResponse(request, "home.html", {
         "user": user, "unit": unit,
-        "doors": sorted(doors, key=lambda d: d.get("Name") or ""), "my_doors": my_doors,
         "used": len(my_people(users, unit)),
         "alloc": settings.allocation_for(unit) or 0,
-        "cap": env.get("MaximumUsersLimitNow") or 0,
-        "active": env.get("TotalActiveUsers") or 0,
-        "temp_live": sum(1 for st in states if st in temps.HOLDS_SEAT),
-        "temp_soon": sum(1 for st in states if st in ("scheduled", "due")),
-        "msg": msg, "err": err,
-    })
+        "msg": msg, "err": err, **ctx})
 
 
 @app.get("/ward", response_class=HTMLResponse)
@@ -652,18 +643,18 @@ def resend_invite(request: Request, uid: str = Form(...), name: str = Form(""),
         return RedirectResponse(f"/ward?err=Could not re-send to {name or uid}: {e}", 303)
 
 
-# ---- temporary people -----------------------------------------------------
-# Doorman keeps its own list of these (store.temp_users) rather than reading
-# them back out of Kindoo, because most of the time there is nothing in Kindoo
-# to read: a window that has not started holds no seat, and one that has ended
-# has been expired away. The list outlives the Kindoo user in both directions.
+# ---- temporary people, and their visits -----------------------------------
+# Two things, kept apart (see doorman/store.py): a saved PERSON -- address,
+# description, doors -- and a VISIT, which is one window for one of them. The
+# common action is not filling in a form; it is picking somebody already in the
+# list and picking a length, so that is what these routes are shaped around.
 #
-# The list is per manager. Every call passes the signed-in address as the owner,
-# so one manager's temporary people never appear on another's page.
+# Everything here is scoped to the signed-in manager. One manager's temporary
+# people never appear on another's page.
 
 
-def _temp_view(row, doors, roster, now=None):
-    """One stored row dressed for display: local times, door names, state."""
+def _visit_view(row, doors, roster, now=None):
+    """One visit dressed for display: local times, door names, state."""
     state, label = temps.state_of(row, now)
     by_id = {d.get("ID"): d.get("Name") for d in doors}
     uid = str(row.get("kindoo_uid") or "")
@@ -676,70 +667,101 @@ def _temp_view(row, doors, roster, now=None):
             "holds_seat": state in temps.HOLDS_SEAT}
 
 
-def _reconcile(owner, rows, roster):
+def _reconcile(owner, visits, roster):
     """Catch up with what Kindoo did on its own.
 
     Kindoo expires a temporary user natively -- Doorman schedules it but does
-    not do the removing. So a row we last saw live whose Kindoo user is no
-    longer in the roster has run its course, and the record is closed here
-    rather than sitting on the page claiming a seat that is already back.
+    not do the removing. So a visit we last saw live whose Kindoo user is no
+    longer in the roster has run its course, and it is closed here rather than
+    sitting on the page claiming a seat that is already back.
     """
     out = []
-    for row in rows:
+    for row in visits:
         uid = str(row.get("kindoo_uid") or "")
         if row.get("status") == "live" and uid and uid not in roster:
-            row = store.update_temp_user(owner, row["id"], status="ended",
-                                         ended_at=temps.to_utc_text(temps.now_utc()),
-                                         note="expired in Kindoo") or row
+            store.update_temp_visit(owner, row["id"], status="ended",
+                                    ended_at=temps.to_utc_text(temps.now_utc()),
+                                    note="expired in Kindoo")
+            row = {**row, "status": "ended", "note": "expired in Kindoo"}
         out.append(row)
     return out
 
 
-@app.get("/temp", response_class=HTMLResponse)
-def temp_page(request: Request, msg: str = "", err: str = ""):
-    """Manage my temporary people: what is live, what is coming, what is over."""
-    user = me(request)
-    try:
-        k = client(request)
-        env = cached(request, "env", k.environment)
-        users = cached(request, "users", k.users)
-        doors = cached(request, "doors", k.entry_points, ttl=600)
-    except KindooError as e:
-        return templates.TemplateResponse(request, "error.html",
-                                          {"user": user, "err": e}, status_code=503)
+def _temp_context(request, user):
+    """Everything both temporary-access screens need, or a KindooError."""
+    k = client(request)
+    env = cached(request, "env", k.environment)
+    users = cached(request, "users", k.users)
+    doors = cached(request, "doors", k.entry_points, ttl=600)
 
     owner = user.get("email")
     roster = {str(u.get("UserID")) for u in users}
-    rows = _reconcile(owner, store.list_temp_users(owner), roster)
-    views = [_temp_view(r, doors, roster) for r in sorted(rows, key=temps.sort_key)]
-    my_doors = [d for d in doors if d.get("ID") in set(user.get("door_ids") or [])]
+    visits = _reconcile(owner, store.list_temp_visits(owner), roster)
+    views = [_visit_view(v, doors, roster) for v in visits]
+
+    # Each saved person carries their own latest visit, so the list can say
+    # "in the building now" or "last in on Tuesday" without a second lookup.
+    latest = {}
+    for v in sorted(views, key=temps.sort_key):
+        latest.setdefault(v["person_id"], v)
+    by_id = {d.get("ID"): d.get("Name") for d in doors}
+    people = []
+    for person in store.list_temp_people(owner):
+        v = latest.get(person["id"])
+        people.append({**person,
+                       "door_names": [by_id.get(i) or f"door {i}"
+                                      for i in person["door_ids"]],
+                       "visit": v,
+                       "state": (v or {}).get("state", ""),
+                       "holds_seat": bool(v and v["holds_seat"])})
+    # Whoever is in the building, or due to be, first.
+    people.sort(key=lambda p: (0 if p["holds_seat"] else
+                               1 if p["state"] in ("due", "scheduled") else 2,
+                               -(p["visit"]["id"] if p["visit"] else 0)))
+
     cap = env.get("MaximumUsersLimitNow") or 0
     active = env.get("TotalActiveUsers") or 0
-    # What each quick window would actually come to, worked out here rather
-    # than in the browser: the rounding and the site's time zone are this
-    # side, and a preview that disagreed with the result would be worse than
-    # no preview at all.
-    previews = {}
-    for key, _label, _span in temps.PRESETS:
-        try:
-            _start, finish = temps.window(key)
-            previews[key] = temps.local_text(temps.to_utc_text(finish))
-        except temps.WindowError:
-            previews[key] = ""
-
-    return templates.TemplateResponse(request, "temp.html", {
-        "user": user, "unit": user.get("unit") or "", "rows": views,
-        "doors": sorted(doors, key=lambda d: d.get("Name") or ""), "my_doors": my_doors,
-        "presets": temps.PRESETS, "previews": previews,
+    return {
+        "people": people, "visits": sorted(views, key=temps.sort_key),
+        "doors": sorted(doors, key=lambda d: d.get("Name") or ""),
+        "my_doors": [d for d in doors if d.get("ID") in set(user.get("door_ids") or [])],
+        "presets": temps.PRESETS, "previews": _previews(),
         "today": temps.now_utc().astimezone(temps.zone()).date(),
         "cap": cap, "active": active, "free": max(cap - active, 0),
         "holding": sum(1 for v in views if v["holds_seat"]),
-        "msg": msg, "err": err,
-    })
+    }
 
 
-def _put_in_kindoo(request, row):
-    """Create one temporary person in Kindoo, as the manager looking at the page.
+def _previews():
+    """What each quick window would actually come to, worked out here rather
+    than in the browser: the rounding and the site's time zone are this side,
+    and a preview that disagreed with the result would be worse than none."""
+    out = {}
+    for key, _label, _span in temps.PRESETS:
+        try:
+            _start, finish = temps.window(key)
+            out[key] = temps.local_text(temps.to_utc_text(finish))
+        except temps.WindowError:
+            out[key] = ""
+    return out
+
+
+@app.get("/temp", response_class=HTMLResponse)
+def temp_page(request: Request, msg: str = "", err: str = "", edit: int = 0):
+    """Manage my temporary people: their defaults, and every visit so far."""
+    user = me(request)
+    try:
+        ctx = _temp_context(request, user)
+    except KindooError as e:
+        return templates.TemplateResponse(request, "error.html",
+                                          {"user": user, "err": e}, status_code=503)
+    return templates.TemplateResponse(request, "temp.html", {
+        "user": user, "unit": user.get("unit") or "", "edit": edit,
+        "msg": msg, "err": err, **ctx})
+
+
+def _put_in_kindoo(request, visit):
+    """Create one visit's Kindoo user, as the manager looking at the page.
 
     The work itself is in temps.activate, because the scheduler does exactly
     the same thing a few minutes before a future window opens. This only adds
@@ -747,91 +769,153 @@ def _put_in_kindoo(request, row):
     so the roster reflects the new person straight away.
     """
     owner = me(request).get("email")
-    problem = temps.activate(client(request), owner, row)
+    problem = temps.activate(client(request), owner, visit)
     drop_cache(request)
     return problem
 
 
-@app.post("/temp")
-def create_temp(request: Request, email: str = Form(...), name: str = Form(""),
-                description: str = Form(""), preset: str = Form(""),
-                day: str = Form(""), starts: str = Form(""), ends: str = Form(""),
-                door_ids: list[str] = Form(default=[])):
-    """Write down a temporary person, and create them now if their time has come."""
-    user = me(request)
-    owner = user.get("email")
-    email = (email or "").strip()
+def _schedule(request, person, preset, day, starts, ends, back):
+    """Book one window for a saved person, and open it now if it has begun."""
+    owner = me(request).get("email")
     try:
         start, end = temps.window(preset, day=day, starts=starts, ends=ends)
     except temps.WindowError as e:
-        return RedirectResponse(f"/temp?err={e}", 303)
+        return RedirectResponse(f"{back}?err={e}", 303)
 
-    doors = [int(d) for d in door_ids if d.strip()] or (user.get("door_ids") or [])
-    temp_id = store.add_temp_user(
-        owner, unit=user.get("unit") or "", email=email, name=(name or "").strip(),
-        description=(description or "").strip(),
-        starts_at=temps.to_utc_text(start), ends_at=temps.to_utc_text(end),
-        door_ids=doors)
+    visit_id = store.add_temp_visit(owner, person["id"], temps.to_utc_text(start),
+                                    temps.to_utc_text(end))
+    visit = store.get_temp_visit(owner, visit_id)
+    who = person["name"] or person["email"]
 
     # A window that has already begun is meant to work now, so the Kindoo user
     # is created immediately. One that starts later is left as a plan: creating
     # it early would hold a seat for days before anybody could use it.
-    row = store.get_temp_user(owner, temp_id)
-    if temps.state_of(row)[0] != "scheduled":
-        problem = _put_in_kindoo(request, row)
-        if problem:
-            return RedirectResponse(f"/temp?err={problem}", 303)
+    if temps.state_of(visit)[0] == "scheduled":
         return RedirectResponse(
-            f"/temp?msg={email} can get in until {temps.local_text(row['ends_at'])}", 303)
-    return RedirectResponse(
-        f"/temp?msg=Saved — {email} will be added to Kindoo for "
-        f"{temps.local_text(row['starts_at'])}", 303)
-
-
-@app.post("/temp/activate")
-def activate_temp(request: Request, temp_id: int = Form(...)):
-    """Create a planned temporary person in Kindoo ahead of their start."""
-    owner = me(request).get("email")
-    row = store.get_temp_user(owner, temp_id)
-    if not row:
-        return RedirectResponse("/temp?err=No such temporary person", 303)
-    problem = _put_in_kindoo(request, row)
+            f"{back}?msg={who} goes into Kindoo shortly before "
+            f"{temps.local_text(visit['starts_at'])}", 303)
+    problem = _put_in_kindoo(request, visit)
     if problem:
-        return RedirectResponse(f"/temp?err={problem}", 303)
-    return RedirectResponse(f"/temp?msg={row['email']} is now in Kindoo", 303)
+        return RedirectResponse(f"{back}?err={problem}", 303)
+    return RedirectResponse(
+        f"{back}?msg={who} can get in until {temps.local_text(visit['ends_at'])}", 303)
 
 
-@app.post("/temp/end")
-def end_temp(request: Request, temp_id: int = Form(...)):
-    """End access now instead of waiting for Kindoo to expire it.
+@app.post("/temp/schedule")
+def schedule_temp(request: Request, person_id: int = Form(...), preset: str = Form(""),
+                  day: str = Form(""), starts: str = Form(""), ends: str = Form(""),
+                  back: str = Form("/temp")):
+    """The common case: somebody already in the list, and a length."""
+    owner = me(request).get("email")
+    person = store.get_temp_person(owner, person_id)
+    if not person:
+        return RedirectResponse(f"{_safe_back(back)}?err=No such person", 303)
+    return _schedule(request, person, preset, day, starts, ends, _safe_back(back))
 
-    The record stays; only the Kindoo user goes. A seat comes back immediately,
-    which is the whole reason for ending one early.
+
+@app.post("/temp/new")
+def new_temp_person(request: Request, email: str = Form(...), name: str = Form(""),
+                    description: str = Form(""), preset: str = Form(""),
+                    day: str = Form(""), starts: str = Form(""), ends: str = Form(""),
+                    door_ids: list[str] = Form(default=[]), back: str = Form("/temp"),
+                    go: str = Form("now")):
+    """Save a new temporary person, and book their first window in the same go.
+
+    `go=save` keeps the person without booking anything -- somebody entered
+    ahead of knowing when they are coming. They are then one tap away on the
+    list, which is the point of saving them at all.
+    """
+    user = me(request)
+    owner = user.get("email")
+    back = _safe_back(back)
+    email = (email or "").strip()
+    if not email:
+        return RedirectResponse(f"{back}?err=An email address is needed", 303)
+    person = store.save_temp_person(
+        owner, email, unit=user.get("unit") or "", name=(name or "").strip(),
+        description=(description or "").strip(),
+        door_ids=[int(d) for d in door_ids if d.strip()] or (user.get("door_ids") or []))
+    if go == "save":
+        return RedirectResponse(
+            f"{back}?msg=Saved {person['name'] or email} — let them in whenever", 303)
+    return _schedule(request, person, preset, day, starts, ends, back)
+
+
+@app.post("/temp/edit")
+def edit_temp_person(request: Request, person_id: int = Form(...),
+                     email: str = Form(...), name: str = Form(""),
+                     description: str = Form(""), door_ids: list[str] = Form(default=[])):
+    """Change what somebody gets by default, for every visit after this one.
+
+    Deliberately does not touch a window already open in Kindoo: the doors
+    somebody is standing in front of are not changed by editing a note here.
     """
     owner = me(request).get("email")
-    row = store.get_temp_user(owner, temp_id)
-    if not row:
-        return RedirectResponse("/temp?err=No such temporary person", 303)
-    problem = temps.end_now(client(request), owner, row)
-    drop_cache(request)
-    if problem:
-        return RedirectResponse(f"/temp?err={problem}", 303)
-    return RedirectResponse(f"/temp?msg=Ended access for {row['email']}", 303)
+    if not store.get_temp_person(owner, person_id):
+        return RedirectResponse("/temp?err=No such person", 303)
+    store.update_temp_person(owner, person_id, email=(email or "").strip(),
+                             name=(name or "").strip(),
+                             description=(description or "").strip(),
+                             door_ids=[int(d) for d in door_ids if d.strip()])
+    return RedirectResponse(f"/temp?msg=Saved {(name or email).strip()}", 303)
 
 
 @app.post("/temp/forget")
-def forget_temp(request: Request, temp_id: int = Form(...)):
-    """Drop the record. Refused while it still has a Kindoo user, because that
-    would leave somebody in the building with nothing tracking them."""
+def forget_temp_person(request: Request, person_id: int = Form(...)):
+    """Drop a saved person and their history. Refused while a window is open,
+    because that would leave somebody in the building with nothing tracking
+    them."""
     owner = me(request).get("email")
-    row = store.get_temp_user(owner, temp_id)
-    if not row:
-        return RedirectResponse("/temp?err=No such temporary person", 303)
-    if temps.state_of(row)[0] in temps.HOLDS_SEAT:
-        return RedirectResponse(
-            "/temp?err=End their access first — they are still in Kindoo", 303)
-    store.delete_temp_user(owner, temp_id)
-    return RedirectResponse(f"/temp?msg=Forgot {row['email']}", 303)
+    person = store.get_temp_person(owner, person_id)
+    if not person:
+        return RedirectResponse("/temp?err=No such person", 303)
+    for v in store.list_temp_visits(owner, person_id):
+        if temps.state_of(v)[0] in temps.HOLDS_SEAT:
+            return RedirectResponse(
+                "/temp?err=End their access first — they are still in Kindoo", 303)
+    store.delete_temp_person(owner, person_id)
+    return RedirectResponse(f"/temp?msg=Forgot {person['name'] or person['email']}", 303)
+
+
+@app.post("/temp/activate")
+def activate_temp(request: Request, visit_id: int = Form(...),
+                  back: str = Form("/temp")):
+    """Open a planned window early, ahead of its start."""
+    owner = me(request).get("email")
+    back = _safe_back(back)
+    visit = store.get_temp_visit(owner, visit_id)
+    if not visit:
+        return RedirectResponse(f"{back}?err=No such visit", 303)
+    problem = _put_in_kindoo(request, visit)
+    if problem:
+        return RedirectResponse(f"{back}?err={problem}", 303)
+    return RedirectResponse(f"{back}?msg={visit['email']} is now in Kindoo", 303)
+
+
+@app.post("/temp/end")
+def end_temp(request: Request, visit_id: int = Form(...), back: str = Form("/temp")):
+    """End access now instead of waiting for Kindoo to expire it.
+
+    The visit stays; only the Kindoo user goes. A seat comes back immediately,
+    which is the whole reason for ending one early.
+    """
+    owner = me(request).get("email")
+    back = _safe_back(back)
+    visit = store.get_temp_visit(owner, visit_id)
+    if not visit:
+        return RedirectResponse(f"{back}?err=No such visit", 303)
+    problem = temps.end_now(client(request), owner, visit)
+    drop_cache(request)
+    if problem:
+        return RedirectResponse(f"{back}?err={problem}", 303)
+    return RedirectResponse(f"{back}?msg=Ended access for {visit['email']}", 303)
+
+
+def _safe_back(back):
+    """Only ever return to one of our own two screens. `back` arrives in a
+    form field, and a redirect target from a form field is somebody else's
+    open redirect if it is trusted."""
+    return back if back in ("/", "/temp") else "/temp"
 
 
 @app.get("/unit", response_class=HTMLResponse)
