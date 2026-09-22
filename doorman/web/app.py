@@ -13,6 +13,7 @@ see whether another unit is eating the shared seat pool.
 """
 import datetime as dt, logging, time
 from collections import Counter
+from urllib.parse import quote
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -456,13 +457,16 @@ def add_person(request: Request, email: str = Form(...), calling: str = Form("")
 
 
 @app.post("/remove")
-def remove_person(request: Request, uid: str = Form(...), name: str = Form("")):
+def remove_person(request: Request, uid: str = Form(...), name: str = Form(""),
+                  back: str = Form("ward")):
+    back = _roster_back(back)
+    sep = "&" if "?" in back else "?"
     try:
         client(request).revoke_user(uid)
         drop_cache(request)
-        return RedirectResponse(f"/ward?msg=Removed {name or uid}", 303)
+        return RedirectResponse(f"{back}{sep}msg=Removed {name or uid}", 303)
     except KindooError as e:
-        return RedirectResponse(f"/ward?err={e}", 303)
+        return RedirectResponse(f"{back}{sep}err={e}", 303)
 
 
 @app.get("/person", response_class=HTMLResponse)
@@ -626,21 +630,23 @@ def save_person_description(request: Request, uid: str = Form(...),
 
 @app.post("/resend")
 def resend_invite(request: Request, uid: str = Form(...), name: str = Form(""),
-                  cc: str = Form("")):
+                  cc: str = Form(""), back: str = Form("ward")):
     """Ask Kindoo to send the invitation email again.
 
     Uses Kindoo's own resend endpoint, so it cannot create a second user the
     way re-running the invite call might.
     """
+    back = _roster_back(back)
+    sep = "&" if "?" in back else "?"
     try:
         client(request).resend_invitation(uid, cc_manager=bool(cc))
-        return RedirectResponse(f"/ward?msg=Invitation re-sent to {name or uid}", 303)
+        return RedirectResponse(f"{back}{sep}msg=Invitation re-sent to {name or uid}", 303)
     except KindooError as e:
         if e.is_permission:
             return RedirectResponse(
-                f"/ward?err=Kindoo refused to re-send to {name or uid} "
+                f"{back}{sep}err=Kindoo refused to re-send to {name or uid} "
                 f"(NoPermission) — they may no longer be in the site", 303)
-        return RedirectResponse(f"/ward?err=Could not re-send to {name or uid}: {e}", 303)
+        return RedirectResponse(f"{back}{sep}err=Could not re-send to {name or uid}: {e}", 303)
 
 
 # ---- temporary people, and their visits -----------------------------------
@@ -998,11 +1004,23 @@ def _safe_back(back):
     return back if back in ("/", "/temp") else "/temp"
 
 
+#: Rosters a manage action can be performed from, as tokens rather than URLs --
+#: the value arrives in a form field, and a redirect target taken from one of
+#: those is somebody else's open redirect the moment it is trusted.
+def _roster_back(where):
+    return {"ward": "/ward",
+            "nounit": "/unit?name=" + quote(NO_UNIT)}.get(where, "/ward")
+
+
 @app.get("/unit", response_class=HTMLResponse)
-def unit_page(request: Request, name: str = ""):
-    """The people in any unit. Read-only: another unit's roster is its own
-    manager's business, so there is no add or remove here -- only your own unit
-    (the front page) is managed."""
+def unit_page(request: Request, name: str = "", msg: str = "", err: str = ""):
+    """The people in any unit.
+
+    Another unit's roster is read-only -- it is its own manager's business, and
+    only your own (/ward) is managed. The people whose description names **no**
+    unit are the exception: they belong to nobody, so nobody would ever be able
+    to tidy them up under that rule. Any manager can act on those.
+    """
     user = me(request)
     if name and name == (user.get("unit") or ""):
         return RedirectResponse("/ward", 303)      # own unit = the managed view
@@ -1022,6 +1040,7 @@ def unit_page(request: Request, name: str = ""):
     rows = _rows_for(people, last, denied)
     return templates.TemplateResponse(request, "unit.html", {
         "user": user, "unit": name, "rows": rows, "window": LOG_WINDOW_DAYS,
+        "manage": name == NO_UNIT, "no_unit": NO_UNIT, "msg": msg, "err": err,
         "alloc": settings.allocation_for(name), "idle": sum(1 for r in rows if not r["last"])})
 
 

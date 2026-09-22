@@ -21,7 +21,7 @@
     {% for r in rows %}
     <li {% if r.mine %}class="mine"{% endif %}>
       <div class="who">
-        <div class="nm"><a href="{{ '/' if r.mine else '/unit?name=' ~ r.unit|urlencode }}"
+        <div class="nm"><a href="{{ '/ward' if r.mine else '/unit?name=' ~ r.unit|urlencode }}"
           class="unitlink">{{ r.unit }}</a>{% if r.mine %} <span class="chip">you</span>{% endif %}</div>
         <div class="ubar" title="{{ r.active }} active, {{ r.idle }} idle">
           <i class="act" style="width:{{ (r.active / mx * 100)|round(1) }}%"></i><i

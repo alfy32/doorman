@@ -1,5 +1,7 @@
 {% extends "base.html" %}{% block body %}
 <p class="sub" style="margin-top:0"><a href="/units">&larr; all units</a></p>
+{% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+{% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
 
 <div class="statline">
   <span class="n">{{ rows|length }}{% if alloc %}/{{ alloc }}{% endif %}</span>
@@ -40,15 +42,40 @@
           {% elif r.denied %}<b style="color:var(--bad)">denied</b><span class="dt">tried {{ r.denied_days }}d ago</span>
           {% else %}<b>never</b><span class="dt">in {{ window }}d</span>{% endif %}
         </div>
-
+        {% if manage %}
+        <span class="acts">
+          {% if not r.accepted %}
+          <form method="post" action="/resend"
+                onsubmit="return confirm('Have Kindoo email the invitation to {{ r.email }} again?')">
+            <input type="hidden" name="uid" value="{{ r.uid }}">
+            <input type="hidden" name="name" value="{{ r.name }}">
+            <input type="hidden" name="back" value="nounit">
+            <button class="danger" type="submit" title="Send the invitation email again">Resend</button>
+          </form>
+          {% endif %}
+          <form method="post" action="/remove"
+                onsubmit="return confirm('Remove {{ r.name }}? This frees their seat and they lose door access.')">
+            <input type="hidden" name="uid" value="{{ r.uid }}">
+            <input type="hidden" name="name" value="{{ r.name }}">
+            <input type="hidden" name="back" value="nounit">
+            <button class="danger" type="submit">Remove</button>
+          </form>
+        </span>
+        {% endif %}
       </div>
     </li>
     {% endfor %}
   </ul>
   {% if not rows %}<p class="muted">Nobody in this unit.</p>{% endif %}
   <p class="sub" id="nomatch" style="display:none">Nothing matches that filter.</p>
+  {% if manage %}
+  <p class="sub" style="margin-bottom:0">These descriptions name no unit, so
+    nobody owns them — any manager can act here. Click a name to give them a
+    unit, change their doors, or see where they have been.</p>
+  {% else %}
   <p class="sub" style="margin-bottom:0">Read-only — this is another unit's roster.
     Manage your own on <a href="/ward">My unit</a>.</p>
+  {% endif %}
 </div>
 
 <script>

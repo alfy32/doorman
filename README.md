@@ -59,7 +59,9 @@ for next Tuesday costs nothing until Tuesday.
   changing them, and who added them
 - **Account history** — the audit trail for one person, paged 60 days at a time
 - **Changes** — a feed of everything that has happened to accounts lately
-- **All units** — people per unit, with idle counts, to spot overuse
+- **All units** — people per unit, with idle counts, to spot overuse. Another
+  unit's roster is read-only, but the people whose description names **no** unit
+  belong to nobody, so any manager can tidy those up
 
 ## Run it
 
