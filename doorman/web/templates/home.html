@@ -99,7 +99,7 @@
     <summary>Someone new</summary>
     <div class="inner">
       <form method="post" action="/temp/new"
-            onsubmit="return this.go.value === 'save' || confirmWhen(this, this.email.value)">
+            onsubmit="return confirmNew(event, this)">
         <input type="hidden" name="back" value="/">
         <div class="tworow">
           <div class="field">

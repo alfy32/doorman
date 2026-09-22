@@ -121,6 +121,16 @@ function confirmWhen(form, who){
                  "\n\nKindoo takes the seat back at the end.");
 }
 
+function confirmNew(ev, form){
+  // Which button was pressed has to come from the submit event. Both buttons
+  // are named `go`, so `form.go` is a RadioNodeList and its .value is always
+  // "" -- reading that asked "let them in?" even when the answer pressed was
+  // "just save them for later", which grants nothing and needs no confirming.
+  var how = ev.submitter && ev.submitter.value;
+  if (how === "save") return true;
+  return confirmWhen(form, form.email.value);
+}
+
 // Match the markup on load: every box starts hidden with the first preset checked.
 document.querySelectorAll("form .whenpick input[name=preset]:checked")
         .forEach(function(r){ pickWhen(r); });
