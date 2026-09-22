@@ -29,8 +29,12 @@ for hh, mm in [(9, 50), (9, 0), (9, 1), (23, 30), (16, 59)]:
     print()
 a, b = temps.window("day", day="2026-10-04", now=at(9, 50))
 print("\nwhole day 4 Oct:", show(a), "->", show(b))
-a, b = temps.window("range", starts="2026-10-04T17:00", ends="2026-10-04T18:30", now=at(9, 50))
-print("typed 17:00-18:30:", show(a), "->", show(b), "(end rounded up)")
+# A typed window is taken at its word -- the rounding is for vague lengths,
+# not for two specific times somebody filled in by hand.
+a, b = temps.window("range", starts="2026-10-04T17:10", ends="2026-10-04T18:35", now=at(9, 50))
+print("typed 17:10-18:35:", show(a), "->", show(b), "(exact, NOT rounded)")
+assert show(b).endswith("6:35 PM"), show(b)
+assert show(a).endswith("5:10 PM"), show(a)
 a, b = temps.window("range", starts="2026-10-04T17:00", ends="2026-10-04T18:00", now=at(9, 50))
 print("typed 17:00-18:00:", show(a), "->", show(b), "(already whole, unchanged)")
 # a DST boundary must still produce a real instant

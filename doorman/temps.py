@@ -19,10 +19,12 @@ Times are stored and sent as UTC. They are *typed* in the site's local zone --
 "the rest of today" means local midnight, not UTC midnight, and getting that
 wrong would end someone's access six hours early.
 
-Windows run in whole hours and always round up (see ceil_hour): asked for two
-hours at 9:50, somebody gets in until 12:00. Every rounding in this module goes
-the same way, because the cost of a few extra minutes of access is nothing next
-to the cost of a person standing at a locked door being told they have a key.
+A window chosen by its length runs in whole hours and always rounds up (see
+ceil_hour): asked for two hours at 9:50, somebody gets in until 12:00. Every
+rounding here goes the same way, because the cost of a few extra minutes of
+access is nothing next to the cost of a person standing at a locked door being
+told they have a key. A window whose start and end are **typed** is exempt --
+those are already the specific times that were meant.
 """
 import datetime as dt
 import logging
@@ -50,6 +52,7 @@ API_FMT = "%Y-%m-%dT%H:%M:%S"
 #: until tomorrow morning is not what was meant.
 PRESETS = [
     ("2h",    "2 hours",       dt.timedelta(hours=2)),
+    ("4h",    "4 hours",       dt.timedelta(hours=4)),
     ("today", "Today",         None),
     ("1w",    "1 week",        dt.timedelta(days=7)),
 ]
@@ -125,6 +128,11 @@ def window(preset, day="", starts="", ends="", now=None):
     """
     tz = zone()
     now = (now or now_utc()).astimezone(tz)
+    # A typed window is taken at its word. The rounding below exists to turn a
+    # vague "two hours" into a whole hour somebody can be told; a start and an
+    # end filled in by hand are already the specific times that were meant, and
+    # nudging those would be overruling the person who typed them.
+    exact = preset == "range"
 
     if preset == "day":
         d = _date(day, "Pick the day they need access.")
@@ -142,7 +150,8 @@ def window(preset, day="", starts="", ends="", now=None):
             raise WindowError("Pick how long they need access for.")
         start, end = now, now + span
 
-    end = ceil_hour(end)
+    if not exact:
+        end = ceil_hour(end)
     if end <= start:
         raise WindowError("That window ends before it starts.")
     # A window already over would create a user Kindoo expires immediately --

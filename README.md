@@ -34,9 +34,12 @@ A visit exists in Doorman before it exists in Kindoo, which is the whole point:
 the plan and creates them only when the window is about to open. A visit booked
 for next Tuesday costs nothing until Tuesday.
 
-- Windows run in **whole hours and round up** — asked for two hours at 9:50,
-  somebody gets in until 12:00. "Today" means the rest of today. The page says
-  what the window comes to before you commit, and again in a confirmation.
+- A window chosen by **length** runs in whole hours and rounds up — asked for
+  two hours at 9:50, somebody gets in until 12:00. "Today" means the rest of
+  today. One whose start and end are **typed** is taken at its word, minutes and
+  all, since those are already the specific times that were meant. Either way the
+  page says what the window comes to before you commit, and again in a
+  confirmation.
 - A window starting **now** goes into Kindoo immediately. One starting **later**
   is created by a background loop (`doorman/scheduler.py`) a few minutes early,
   using that manager's own token, so nobody is left at a locked door at the

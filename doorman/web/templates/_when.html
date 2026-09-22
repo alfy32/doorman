@@ -31,9 +31,9 @@
 <div class="whenbox when-range" hidden>
   <div class="tworow">
     <div><label class="sub">Access starts</label>
-      <input type="datetime-local" name="starts" step="3600" onchange="pickWhen(this)"></div>
+      <input type="datetime-local" name="starts" onchange="pickWhen(this)"></div>
     <div><label class="sub">Access ends</label>
-      <input type="datetime-local" name="ends" step="3600" onchange="pickWhen(this)"></div>
+      <input type="datetime-local" name="ends" onchange="pickWhen(this)"></div>
   </div>
   <div class="sub">A start in the future is scheduled, not created now.</div>
 </div>
@@ -59,15 +59,11 @@ function hour12(hhmm){
   return (h % 12 || 12) + ":" + m[2] + " " + (h < 12 ? "AM" : "PM");
 }
 
-function tidyHour(value){
-  // "2026-10-04T18:30" -> "19:00". Pure string work: the date and the zone are
-  // untouched, so there is no clock arithmetic here to get wrong.
-  var m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(value || "");
-  if (!m) return null;
-  var h = parseInt(m[2], 10);
-  if (parseInt(m[3], 10) > 0) h += 1;
-  if (h > 23) return {day: null, text: "midnight"};          // rolls into tomorrow
-  return {day: m[1], text: (h < 10 ? "0" + h : h) + ":00"};
+function splitStamp(value){
+  // "2026-10-04T18:30" -> {day, text}. Taken as typed: this option is for
+  // naming a specific time, so nothing here rounds it.
+  var m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(value || "");
+  return m ? {day: m[1], text: m[2]} : null;
 }
 
 function readable(day, time){
@@ -85,16 +81,12 @@ function verdictText(form){
     return day ? "All of " + readable(day) + ", midnight to midnight." : "";
   }
   if (picked.value === "range") {
-    var from = form.querySelector('input[name=starts]').value;
-    var to = tidyHour(form.querySelector('input[name=ends]').value);
-    if (!from || !to) return "";
-    var f = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(from);
-    if (!f) return "";
-    // Within one day the date is said once: "from Sun 4 Oct, 5:00 PM until 7:00 PM".
-    var finish = !to.day ? "midnight that night"
-               : to.day === f[1] ? hour12(to.text)
-               : readable(to.day, to.text);
-    return "From " + readable(f[1], f[2]) + " until " + finish + ".";
+    var f = splitStamp(form.querySelector('input[name=starts]').value);
+    var to = splitStamp(form.querySelector('input[name=ends]').value);
+    if (!f || !to) return "";
+    // Within one day the date is said once: "from Sun 4 Oct, 5:00 PM until 7:30 PM".
+    var finish = to.day === f.day ? hour12(to.text) : readable(to.day, to.text);
+    return "From " + readable(f.day, f.text) + " until " + finish + ".";
   }
   var until = picked.getAttribute("data-until");
   return until ? "They can get in from now until " + until + "." : "";
