@@ -20,9 +20,10 @@ Deliberately a plain asyncio task rather than cron or a job runner:
     app was down is simply due, and goes in on the first pass.
 
 The end of a window is Kindoo's job, not this loop's: temporary users carry a
-native ExpiryDate and Kindoo removes them itself. Doorman only notices the
-removal afterwards and closes its own record (see the reconcile step in the
-web app).
+native ExpiryDate and Kindoo removes them itself when the window ends --
+confirmed on this site, not assumed. Doorman only notices the removal
+afterwards and closes its own record (see the reconcile step in the web app),
+which is why there is no expirer here to match the creator.
 """
 import asyncio
 import logging
