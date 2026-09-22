@@ -1,0 +1,81 @@
+{% extends "base.html" %}{% block body %}
+{% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+{% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
+
+{% if not unit %}
+<div class="flash bad">No unit set for you yet — pick one on
+  <a href="/settings">Settings</a>.</div>
+{% endif %}
+
+<div class="statline">
+  <span class="n {{ 'over' if alloc and used>alloc }}">{{ used }}{% if alloc %}/{{ alloc }}{% endif %}</span>
+  <a href="/ward">{{ unit or "my unit" }}</a>
+  {% if alloc and used>alloc %}<span class="warnb">{{ used-alloc }} over</span>
+  {% elif alloc %}<span class="muted">{{ alloc-used }} left</span>{% endif %}
+  <span class="muted">&middot;</span>
+  <a href="/units" class="muted">site {{ active }}/{{ cap }}</a>
+</div>
+
+<div class="card">
+  <h2>Add someone to {{ unit or "my unit" }}</h2>
+  <p class="sub" style="margin:-4px 0 12px">They stay until you remove them.
+    Passing through for a day or a week? Make them
+    <a href="/temp">temporary</a> instead, and the seat comes back on its own.</p>
+
+  <form method="post" action="/add">
+    <div class="field">
+      <label>Email</label>
+      <input type="email" name="email" required placeholder="person@example.com">
+    </div>
+    <div class="field">
+      <label>Calling / role</label>
+      <input type="text" name="calling" placeholder="e.g. Treasurer">
+      <div class="sub" style="margin-top:5px">Saved as
+        <span class="mono">{{ unit }} (your text)</span></div>
+    </div>
+    <div class="field">
+      <label>Doors</label>
+      {% if my_doors %}
+        <div class="doorlist">
+          {% for d in my_doors %}<div>{{ d.Name }}</div>{% endfor %}
+        </div>
+        <details class="otherdoors">
+          <summary>Use different doors just this once</summary>
+          <div style="padding-top:6px">
+            {% for d in doors %}
+            <label class="door">
+              <input type="checkbox" name="door_ids" value="{{ d.ID }}"
+                     {{ 'checked' if d.ID in (user.door_ids or []) }}>
+              {{ d.Name }}</label>
+            {% endfor %}
+          </div>
+        </details>
+      {% else %}
+        <div class="flash bad" style="margin:0">
+          No default doors set — choose them on <a href="/settings">Settings</a>,
+          or this person will be added with no access.
+        </div>
+      {% endif %}
+    </div>
+
+    <button type="submit">Add person</button>
+  </form>
+</div>
+
+<div class="card altact">
+  <div class="altact-text">
+    <div class="sumunit">Just visiting?</div>
+    <p class="sub" style="margin:2px 0 0">A temporary person gets in for a set
+      window — two hours, a day, a week — and Kindoo takes the seat back at the
+      end.
+      {% if temp_live or temp_soon %}
+        You have
+        {% if temp_live %}<b>{{ temp_live }}</b> in the building now{% endif %}
+        {%- if temp_live and temp_soon %} and {% endif -%}
+        {% if temp_soon %}<b>{{ temp_soon }}</b> coming up{% endif %}.
+      {% endif %}
+    </p>
+  </div>
+  <a class="bigbtn" href="/temp">New temporary user &rarr;</a>
+</div>
+{% endblock %}

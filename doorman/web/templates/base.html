@@ -8,20 +8,26 @@
 </head>
 <body>
 {% set path = request.url.path %}
-{% set page = 'My unit'   if path == '/' else
+{% set page = 'Add'       if path == '/' else
+              'My unit'   if path == '/ward' else
+              'Temporary' if path.startswith('/temp') else
               'All units' if path in ('/units', '/unit') else
               'Changes'   if path == '/changes' else
               'Settings'  if path == '/settings' else
               'Person'    if path in ('/person', '/history') else 'Doorman' %}
 {% macro navlinks() %}
-  <a href="/"         class="{{ 'on' if path == '/' }}">My unit</a>
+  <a href="/"         class="{{ 'on' if path == '/' }}">Add</a>
+  <a href="/ward"     class="{{ 'on' if path == '/ward' }}">My unit</a>
+  <a href="/temp"     class="{{ 'on' if path.startswith('/temp') }}">Temporary</a>
   <a href="/units"    class="{{ 'on' if path in ('/units','/unit') }}">All units</a>
   <a href="/changes"  class="{{ 'on' if path == '/changes' }}">Changes</a>
   <a href="/settings" class="{{ 'on' if path == '/settings' }}">Settings</a>
 {% endmacro %}
 <header><div class="wrap" style="padding:10px 16px">
   <div class="topbar">
-    <div class="brand">Doorman{% if user %} <small>{{ user.name or user.email }}</small>{% endif %}</div>
+    {# The name is the way home: every page is one tap from the thing you
+       came to do, without spending a nav slot on it. #}
+    <div class="brand"><a href="/" title="Add someone">Doorman</a>{% if user %} <small>{{ user.name or user.email }}</small>{% endif %}</div>
     {% if user %}
     {# Phone: a hamburger. Desktop: plain tabs. Two elements rather than one,
        because a <details> hides its own content unless open -- trying to reuse

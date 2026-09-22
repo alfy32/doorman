@@ -16,49 +16,10 @@
   <a href="/units" class="muted">site {{ active }}/{{ cap }}</a>
 </div>
 
-<details class="add" {% if err %}open{% endif %}>
-  <summary>Add someone to {{ unit or "my unit" }}</summary>
-  <div class="inner">
-    <form method="post" action="/add">
-      <div class="field">
-        <label>Email</label>
-        <input type="email" name="email" required placeholder="person@example.com">
-      </div>
-      <div class="field">
-        <label>Calling / role</label>
-        <input type="text" name="calling" placeholder="e.g. Treasurer">
-        <div class="sub" style="margin-top:5px">Saved as
-          <span class="mono">{{ unit }} (your text)</span></div>
-      </div>
-      <div class="field">
-        <label>Doors</label>
-        {% if my_doors %}
-          <div class="doorlist">
-            {% for d in my_doors %}<div>{{ d.Name }}</div>{% endfor %}
-          </div>
-          <details class="otherdoors">
-            <summary>Use different doors just this once</summary>
-            <div style="padding-top:6px">
-              {% for d in doors %}
-              <label class="door">
-                <input type="checkbox" name="door_ids" value="{{ d.ID }}"
-                       {{ 'checked' if d.ID in (user.door_ids or []) }}>
-                {{ d.Name }}</label>
-              {% endfor %}
-            </div>
-          </details>
-        {% else %}
-          <div class="flash bad" style="margin:0">
-            No default doors set — choose them on <a href="/settings">Settings</a>,
-            or this person will be added with no access.
-          </div>
-        {% endif %}
-      </div>
-
-      <button type="submit">Add person</button>
-    </form>
-  </div>
-</details>
+<p class="sub" style="margin:0 0 14px">
+  <a class="btnlink" href="/">Add someone &rarr;</a>
+  <a class="btnlink" href="/temp">Temporary access &rarr;</a>
+</p>
 
 <div class="card">
   <h2>{{ rows|length }} {{ 'person' if rows|length==1 else 'people' }}</h2>

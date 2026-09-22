@@ -1,0 +1,264 @@
+{% extends "base.html" %}{% block body %}
+{% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+{% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
+
+{% set chip = {'live':'ok', 'expiring':'warn', 'due':'warn', 'scheduled':'',
+               'failed':'bad', 'missed':'bad', 'ended':''} %}
+
+<div class="statline">
+  <span class="n">{{ holding }}</span>
+  <span>temporary in the building</span>
+  <span class="muted">&middot;</span>
+  <a href="/units" class="muted">site {{ active }}/{{ cap }}</a>
+  {% if free <= 2 %}<span class="warnb">{{ free }} seat{{ 's' if free != 1 }} free</span>
+  {% else %}<span class="muted">{{ free }} free</span>{% endif %}
+</div>
+
+<div class="card">
+  <h2>New temporary user</h2>
+  <p class="sub" style="margin:-4px 0 12px">Starting now, they go into Kindoo
+    straight away. Scheduled for later, Doorman holds the plan and creates them
+    a few minutes <i>before</i> their window opens &mdash; so no seat is spent
+    until then, and nobody is left at the door on the stroke of the hour.</p>
+
+  <form method="post" action="/temp" onsubmit="return confirmTemp()">
+    <div class="field">
+      <label>Email</label>
+      <input type="email" name="email" required placeholder="person@example.com">
+    </div>
+    <div class="field">
+      <label>Name <span class="muted" style="text-transform:none">(optional)</span></label>
+      <input type="text" name="name" placeholder="So you know who this is"
+             autocapitalize="words">
+      <div class="sub" style="margin-top:5px">Kindoo shows no name until they
+        accept the invitation &mdash; this is for your list.</div>
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <input type="text" name="description" placeholder="e.g. Scout leader, piano tuner">
+      <div class="sub" style="margin-top:5px">Saved in Kindoo as
+        <span class="mono">{{ unit }} (your text)</span></div>
+    </div>
+
+    <div class="field">
+      <label>How long</label>
+      <div class="whenpick">
+        {% for key, label, _span in presets %}
+        <label class="when-opt">
+          <input type="radio" name="preset" value="{{ key }}"
+                 data-until="{{ previews.get(key, '') }}"
+                 {{ 'checked' if loop.first }} onchange="pickWhen()">
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+        <label class="when-opt">
+          <input type="radio" name="preset" value="day" onchange="pickWhen()">
+          <span>A whole day</span>
+        </label>
+        <label class="when-opt">
+          <input type="radio" name="preset" value="range" onchange="pickWhen()">
+          <span>Set start and end</span>
+        </label>
+      </div>
+
+      <div class="whenbox" id="when-day" hidden>
+        <label class="sub" for="day">Which day</label>
+        <input type="date" id="day" name="day" value="{{ today }}" onchange="pickWhen()">
+      </div>
+
+      <div class="whenbox" id="when-range" hidden>
+        <div class="tworow">
+          <div><label class="sub" for="starts">Access starts</label>
+            <input type="datetime-local" id="starts" name="starts" step="3600"
+                   onchange="pickWhen()"></div>
+          <div><label class="sub" for="ends">Access ends</label>
+            <input type="datetime-local" id="ends" name="ends" step="3600"
+                   onchange="pickWhen()"></div>
+        </div>
+        <div class="sub">A start in the future is scheduled, not created now.</div>
+      </div>
+
+      <div class="verdict" id="verdict"></div>
+    </div>
+
+    <div class="field">
+      <label>Doors</label>
+      {% if my_doors %}
+        <div class="doorlist">
+          {% for d in my_doors %}<div>{{ d.Name }}</div>{% endfor %}
+        </div>
+        <details class="otherdoors">
+          <summary>Use different doors just this once</summary>
+          <div style="padding-top:6px">
+            {% for d in doors %}
+            <label class="door">
+              <input type="checkbox" name="door_ids" value="{{ d.ID }}"
+                     {{ 'checked' if d.ID in (user.door_ids or []) }}>
+              {{ d.Name }}</label>
+            {% endfor %}
+          </div>
+        </details>
+      {% else %}
+        <div class="flash bad" style="margin:0">
+          No default doors set — choose them on <a href="/settings">Settings</a>,
+          or this person will be added with no access.
+        </div>
+      {% endif %}
+    </div>
+
+    <button type="submit">Add temporary user</button>
+  </form>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h2>My temporary people</h2>
+  <p class="sub" style="margin:-4px 0 10px">Yours only &mdash; each manager keeps
+    their own list. It stays here after the window closes, so you can see who
+    was let in and when.</p>
+
+  {% if rows %}
+  <ul class="people">
+    {% for r in rows %}
+    <li>
+      <div class="who">
+        {# Most of these people have no name in Kindoo until they accept, so the
+           address is the name when nothing better exists -- printed once, not
+           twice down the row. #}
+        <div class="nm">{% if r.name %}{{ r.name }}{% else %}{{ r.email }}{% endif %}</div>
+        <div class="em">{% if r.name %}{{ r.email }}{% endif %}</div>
+        <div class="ds">
+          {{ r.description or "no description" }}
+          <div class="tags">
+            <span class="chip {{ chip.get(r.state, '') }}">{{ r.state_label }}</span>
+            {% if r.state == 'live' and not r.in_kindoo %}
+            <span class="chip bad">not found in Kindoo</span>{% endif %}
+            {% if r.door_names %}
+            <span class="chip">{{ r.door_names|length }} door{{ 's' if r.door_names|length != 1 }}</span>
+            {% endif %}
+          </div>
+          {% if r.note %}<div class="sub" style="margin-top:3px">{{ r.note }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="meta">
+        {# `window` opts out of the middot the roster puts between its two
+           halves: these are a start and an end, and they need the word. #}
+        <div class="when window">
+          <b>{{ r.starts_text or "?" }}</b>
+          <span class="dt">until {{ r.ends_text or "?" }}</span>
+        </div>
+        <span class="acts">
+          {% if r.state in ('scheduled', 'due', 'failed') %}
+          <form method="post" action="/temp/activate">
+            <input type="hidden" name="temp_id" value="{{ r.id }}">
+            <button type="submit" title="Create them in Kindoo now, taking a seat">
+              {% if r.state == 'failed' %}Try again{% else %}Add now{% endif %}</button>
+          </form>
+          {% endif %}
+          {% if r.holds_seat %}
+          <form method="post" action="/temp/end"
+                onsubmit="return confirm('End access for {{ r.email }} now? Their seat comes back immediately.')">
+            <input type="hidden" name="temp_id" value="{{ r.id }}">
+            <button class="danger" type="submit">End access</button>
+          </form>
+          {% else %}
+          <form method="post" action="/temp/forget"
+                onsubmit="return confirm('Forget {{ r.email }}? This only removes your record — nothing changes in Kindoo.')">
+            <input type="hidden" name="temp_id" value="{{ r.id }}">
+            <button class="danger" type="submit" title="Remove this record">Forget</button>
+          </form>
+          {% endif %}
+        </span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted" style="margin:0">Nobody yet. Add someone above and they will
+    appear here until their window closes.</p>
+  {% endif %}
+</div>
+
+<script>
+// Say plainly what the chosen option comes to, before it is chosen.
+//
+// Windows run in whole hours and round UP, which is a surprise worth showing
+// rather than explaining: picking "2 hours" at 9:50 reads "until 12:00 PM", not
+// "until 11:50". The preset wordings come from the server (data-until) because
+// the rounding and the site's time zone live there; only the two typed options
+// are worked out here, where there is nothing to work out but the text itself.
+function chosen(){
+  return document.querySelector('input[name=preset]:checked');
+}
+
+function tidyHour(value){
+  // "2026-10-04T18:30" -> "2026-10-04T19:00". Pure string work: the date and
+  // the zone are untouched, so there is no clock arithmetic to get wrong.
+  var m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(value || "");
+  if (!m) return null;
+  var h = parseInt(m[2], 10);
+  if (parseInt(m[3], 10) > 0) h += 1;
+  if (h > 23) return {day: null, text: "midnight"};          // rolls into tomorrow
+  return {day: m[1], text: (h < 10 ? "0" + h : h) + ":00"};
+}
+
+function hour12(hhmm){
+  // "17:00" -> "5:00 PM", to match how every other time on this page reads.
+  var m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || "");
+  if (!m) return hhmm;
+  var h = parseInt(m[1], 10);
+  return (h % 12 || 12) + ":" + m[2] + " " + (h < 12 ? "AM" : "PM");
+}
+
+function readable(day, time){
+  var d = new Date(day + "T12:00:00");
+  var date = isNaN(d) ? day : d.toLocaleDateString(undefined,
+    {weekday: "short", day: "numeric", month: "short"});
+  return time ? date + ", " + hour12(time) : date;
+}
+
+function verdictText(){
+  var picked = chosen();
+  if (!picked) return "";
+  if (picked.value === "day") {
+    var day = document.getElementById("day").value;
+    return day ? "All of " + readable(day) + ", midnight to midnight." : "";
+  }
+  if (picked.value === "range") {
+    var from = document.getElementById("starts").value;
+    var to = tidyHour(document.getElementById("ends").value);
+    if (!from || !to) return "";
+    var f = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(from);
+    if (!f) return "";
+    // Within one day the date is said once: "from Sun 4 Oct, 5:00 PM until 7:00 PM".
+    var finish = !to.day ? "midnight that night"
+               : to.day === f[1] ? hour12(to.text)
+               : readable(to.day, to.text);
+    return "From " + readable(f[1], f[2]) + " until " + finish + ".";
+  }
+  var until = picked.getAttribute("data-until");
+  return until ? "They can get in from now until " + until + "." : "";
+}
+
+function pickWhen(){
+  var which = chosen() ? chosen().value : "";
+  document.getElementById("when-day").hidden   = which !== "day";
+  document.getElementById("when-range").hidden = which !== "range";
+  var box = document.getElementById("verdict");
+  var text = verdictText();
+  box.textContent = text;
+  box.hidden = !text;
+}
+
+function confirmTemp(){
+  // The same sentence again at the moment it becomes real. Somebody is being
+  // given a key to a building; one more read of the actual window is cheap.
+  var who = document.querySelector('input[name=email]').value || "this person";
+  var text = verdictText();
+  return confirm("Give " + who + " temporary access?\n\n" +
+                 (text || "Check the window before continuing.") +
+                 "\n\nKindoo takes the seat back at the end.");
+}
+
+pickWhen();
+</script>
+{% endblock %}

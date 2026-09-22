@@ -2,7 +2,13 @@
   "kindoo": {
     "//eid": "Numeric environment id for your site (EnvironmentID from KindooGetEnvironments).",
     "eid": 0,
-    "base_url": "https://api.kindoo.tech/v3/webservice.asmx"
+    "base_url": "https://api.kindoo.tech/v3/webservice.asmx",
+    "//expiry_timezone": "Time zone Kindoo stamps on a temporary user's expiry. It wants a WINDOWS id ('Mountain Standard Time'), not an IANA one.",
+    "expiry_timezone": "Mountain Standard Time"
+  },
+  "//site": "Where the building is. `timezone` is an IANA name and is how a typed time is read -- 'the rest of today' means local midnight, not UTC midnight.",
+  "site": {
+    "timezone": "America/Denver"
   },
   "server": {
     "//host": "127.0.0.1 means this machine only. Change only behind an authenticating proxy.",

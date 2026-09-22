@@ -10,14 +10,39 @@ A small self-hosted tool for managing door access at a site that uses the
 Each manager looks after the people in their own unit. Doorman gives them the
 three things that job actually needs:
 
-1. **See my people** — name, email, calling, and *when they last opened a door*
-2. **Add someone** — email plus a calling; creates the user and grants the
-   doors that unit uses
-3. **Remove someone** — when the shared seat licence gets tight
+1. **Add someone** — email plus a calling; creates the user and grants the
+   doors that unit uses. This is the home page, since it is what the tool is
+   opened to do.
+2. **Let someone in temporarily** — a visitor who needs a key for two hours,
+   today, a week, or a window you set. See below.
+3. **See my people** — name, email, calling, and *when they last opened a door*
+4. **Remove someone** — when the shared seat licence gets tight
 
 Seats are licensed and capped across every unit sharing the site, so the app
 also shows who is drawing on that pool and how much of each unit's allocation
 is sitting idle.
+
+### Temporary people
+
+A temporary person exists in Doorman before they exist in Kindoo, which is the
+whole point: **a Kindoo seat is consumed the moment the user is created**, so
+Doorman holds the plan and creates them only when their window is about to
+open. A visit booked for next Tuesday costs nothing until Tuesday.
+
+- Windows run in **whole hours and round up** — asked for two hours at 9:50,
+  somebody gets in until 12:00. The page says what the window comes to before
+  you commit to it, and again in a confirmation.
+- A window starting **now** goes into Kindoo immediately. One starting **later**
+  is created by a background loop (`doorman/scheduler.py`) a few minutes early,
+  using that manager's own token, so nobody is left at a locked door at the
+  minute they were promised.
+- Nothing is held in memory, so **a restart loses nothing**: each pass asks the
+  database which windows are about to open. A start time that passed while the
+  app was down is simply due, and goes in on the next pass.
+- Kindoo expires them natively at the end. Doorman notices the removal and
+  closes its own record, or you can **end one early** and get the seat back now.
+- The list is **per manager** — each one sees the people they arranged. It keeps
+  rows after the window closes, so it is also the record of who was let in.
 
 ### Also included
 - **Resend invitation** for anyone who has not accepted theirs
@@ -162,11 +187,14 @@ doorman/
   units.py      whitespace-tolerant unit-name matching
   store.py      SQLite: accounts and per-manager settings
   auth.py       sign-up allow-list, password hashing
+  temps.py      temporary people: windows, hour rounding, becoming a Kindoo user
+  scheduler.py  creates scheduled temporary users just before their window opens
   config.py     loads local/config.json; no secrets or site data in source
   web/app.py    routes
   web/static/   stylesheet, served with a content hash for cache-busting
 local/          site config, database, session key (git-ignored)
 deploy/         systemd unit, installer, and update script
+tests/          run directly with python; they stub Kindoo and call nothing live
 ```
 
 ## Notes on the Kindoo API

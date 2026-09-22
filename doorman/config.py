@@ -89,6 +89,24 @@ class Settings:
     def base(self):  return str(self._get("KINDOO_BASE", "kindoo", "base_url",
                         default="https://api.kindoo.tech/v3/webservice.asmx"))
     @property
+    def timezone(self):
+        """The site's own time zone, as an IANA name.
+
+        Windows the manager types ("rest of today", "a specific day") are local
+        ones -- they mean local midnight, not UTC midnight. Everything is stored
+        and sent in UTC; this is only how a typed time is read.
+        """
+        return str(self._get("DOORMAN_TZ", "site", "timezone", default="America/Denver"))
+
+    @property
+    def expiry_timezone(self):
+        """What Kindoo wants in `ExpiryTimeZone` -- a WINDOWS time-zone id
+        ("Mountain Standard Time"), not the IANA name above. Confirmed against
+        live temp users; see KINDOO-API-FINDINGS.md."""
+        return str(self._get("KINDOO_TZ", "kindoo", "expiry_timezone",
+                             default="Mountain Standard Time"))
+
+    @property
     def host(self):  return str(self._get("DOORMAN_HOST", "server", "host", default="127.0.0.1"))
     @property
     def port(self):  return int(self._get("DOORMAN_PORT", "server", "port", default=8000))

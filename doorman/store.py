@@ -40,6 +40,35 @@ CREATE TABLE IF NOT EXISTS accounts (
     door_ids         TEXT NOT NULL DEFAULT '[]',
     created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Temporary people, as Doorman remembers them.
+--
+-- This is OUR list, not a view of Kindoo's. A row may have no Kindoo user at
+-- all: one that is still only planned has not been created yet, and one that
+-- has expired is gone from the site while the record of it stays here. So
+-- `kindoo_uid` is empty far more often than not, and nothing may assume a row
+-- can be resolved against the roster.
+--
+-- `owner` is the manager who created it. The list is per manager -- each one
+-- sees the temporary people they arranged, not everybody's.
+CREATE TABLE IF NOT EXISTS temp_users (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner        TEXT NOT NULL,             -- account email; scopes the whole list
+    unit         TEXT NOT NULL DEFAULT '',
+    email        TEXT NOT NULL DEFAULT '',
+    name         TEXT NOT NULL DEFAULT '',
+    description  TEXT NOT NULL DEFAULT '',  -- the text Kindoo shows: calling, or why
+    starts_at    TEXT NOT NULL DEFAULT '',  -- UTC isoformat
+    ends_at      TEXT NOT NULL DEFAULT '',  -- UTC isoformat
+    door_ids     TEXT NOT NULL DEFAULT '[]',
+    kindoo_uid   TEXT NOT NULL DEFAULT '',  -- empty until they exist in Kindoo
+    kindoo_euid  TEXT NOT NULL DEFAULT '',
+    status       TEXT NOT NULL DEFAULT 'planned',   -- planned|live|ended|failed
+    note         TEXT NOT NULL DEFAULT '',  -- what went wrong, if anything
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    ended_at     TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS temp_users_owner ON temp_users (owner, ends_at);
 """
 
 
@@ -131,3 +160,81 @@ def purge_verifications(before):
                     (before,))
 
 
+
+
+# ---- temporary people -----------------------------------------------------
+# Every read is scoped by owner. Passing the owner in rather than filtering
+# afterwards means a missing scope is a missing argument, not a silent leak of
+# one manager's list into another's.
+
+def _temp_row(r):
+    d = dict(r)
+    try:
+        d["door_ids"] = json.loads(d.get("door_ids") or "[]")
+    except json.JSONDecodeError:
+        d["door_ids"] = []
+    return d
+
+
+def _temp_owner(email):
+    return (email or "").strip().casefold()
+
+
+def add_temp_user(owner, **fields):
+    fields["owner"] = _temp_owner(owner)
+    if "door_ids" in fields:
+        fields["door_ids"] = json.dumps(list(fields["door_ids"]))
+    cols = ", ".join(fields)
+    marks = ", ".join("?" for _ in fields)
+    with connect() as con:
+        cur = con.execute(f"INSERT INTO temp_users ({cols}) VALUES ({marks})",
+                          tuple(fields.values()))
+        return cur.lastrowid
+
+
+def list_temp_users(owner):
+    """Newest window first -- what is live or coming up sits at the top."""
+    with connect() as con:
+        return [_temp_row(r) for r in con.execute(
+            "SELECT * FROM temp_users WHERE owner = ? "
+            "ORDER BY ends_at DESC, id DESC", (_temp_owner(owner),))]
+
+
+def get_temp_user(owner, temp_id):
+    with connect() as con:
+        r = con.execute("SELECT * FROM temp_users WHERE id = ? AND owner = ?",
+                        (temp_id, _temp_owner(owner))).fetchone()
+        return _temp_row(r) if r else None
+
+
+def update_temp_user(owner, temp_id, **fields):
+    if not fields:
+        return get_temp_user(owner, temp_id)
+    if "door_ids" in fields:
+        fields["door_ids"] = json.dumps(list(fields["door_ids"]))
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    with connect() as con:
+        con.execute(f"UPDATE temp_users SET {cols} WHERE id = ? AND owner = ?",
+                    (*fields.values(), temp_id, _temp_owner(owner)))
+    return get_temp_user(owner, temp_id)
+
+
+def delete_temp_user(owner, temp_id):
+    with connect() as con:
+        con.execute("DELETE FROM temp_users WHERE id = ? AND owner = ?",
+                    (temp_id, _temp_owner(owner)))
+
+
+def due_temp_users(before, now):
+    """Planned rows whose window is about to open, across ALL owners.
+
+    The only unscoped read of this table, and deliberately so: the scheduler
+    works on behalf of every manager at once, and each row carries the owner
+    whose token will be used. Rows whose window has already closed are left
+    alone -- creating a user Kindoo would expire on sight spends a seat on
+    nothing.
+    """
+    with connect() as con:
+        return [_temp_row(r) for r in con.execute(
+            "SELECT * FROM temp_users WHERE status = 'planned' "
+            "AND starts_at <= ? AND ends_at > ? ORDER BY starts_at", (before, now))]

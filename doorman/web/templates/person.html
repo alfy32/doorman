@@ -1,5 +1,5 @@
 {% extends "base.html" %}{% block body %}
-<p class="sub" style="margin-top:0"><a href="/">&larr; back to {{ user.unit or "my unit" }}</a></p>
+<p class="sub" style="margin-top:0"><a href="/ward">&larr; back to {{ user.unit or "my unit" }}</a></p>
 {% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
 {% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
 
