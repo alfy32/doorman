@@ -148,7 +148,9 @@ proved they own it.
 **Only enable this with `host` set to `127.0.0.1`.** It trusts the edge's
 account of who is calling, which holds only while the edge cannot be bypassed.
 Signing out redirects to Cloudflare's logout: dropping the local session alone
-would re-authenticate on the very next request.
+would re-authenticate on the very next request. It passes `returnTo`, so
+Cloudflare bounces straight back to the site and Access asks to sign in again,
+rather than stranding anyone on a bare Cloudflare page.
 
 ## Verifying
 

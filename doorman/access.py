@@ -16,6 +16,7 @@ ever pointed at the wrong team. Hence: off unless configured, and bind to
 127.0.0.1 before turning it on.
 """
 import logging
+from urllib.parse import quote
 
 import jwt
 from jwt import PyJWKClient
@@ -64,9 +65,17 @@ def verified_email(request, cfg):
     return email or None
 
 
-def logout_url(cfg):
+def logout_url(cfg, return_to=None):
     """Where to send someone so Cloudflare forgets them too. Clearing only the
-    local session would be pointless: the next request re-authenticates."""
-    if cfg.get("enabled") and cfg.get("team_domain"):
-        return f"https://{cfg['team_domain']}/cdn-cgi/access/logout"
-    return None
+    local session would be pointless: the next request re-authenticates.
+
+    `return_to` bounces them straight back to the site afterwards, where Access
+    asks them to sign in again -- otherwise they land on a bare Cloudflare page
+    with no way back.
+    """
+    if not (cfg.get("enabled") and cfg.get("team_domain")):
+        return None
+    url = f"https://{cfg['team_domain']}/cdn-cgi/access/logout"
+    if return_to:
+        url += "?returnTo=" + quote(return_to, safe="")
+    return url

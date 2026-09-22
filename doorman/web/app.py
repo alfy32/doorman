@@ -890,5 +890,6 @@ def logout(request: Request):
     # Clearing only the local session would be theatre: the Access token is
     # still in the browser, so the next request would sign them straight back
     # in. Send them to Cloudflare to drop it.
-    away = access.logout_url(settings.access)
+    home = settings.public_url or str(request.base_url).rstrip("/")
+    away = access.logout_url(settings.access, return_to=home + "/")
     return RedirectResponse(away or "/login?msg=Signed out", 303)
