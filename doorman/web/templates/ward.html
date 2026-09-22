@@ -50,7 +50,7 @@
       </div>
       <div class="meta">
         <div class="when">
-          {% if r.last %}<b>{{ r.days }}d ago</b><span class="dt">{{ r.last[:10] }}</span>
+          {% if r.last %}<b>{{ r.days }}d ago</b><span class="dt">{{ r.last|on }}</span>
           {% elif r.denied %}<b style="color:var(--bad)">denied</b><span class="dt">tried {{ r.denied_days }}d ago</span>
           {% else %}<b>never</b><span class="dt">in {{ window }}d</span>{% endif %}
         </div>

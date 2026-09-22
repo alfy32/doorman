@@ -123,6 +123,14 @@ def css_version():
 
 templates.env.globals["css_version"] = css_version
 
+# Kindoo hands back every timestamp in UTC with a Z on the end, and slicing the
+# string to show it printed UTC straight onto the page -- a door opened at
+# 3:37pm read "21:37". These convert to the site's own zone on the way out, and
+# say the time the way a person says it.
+templates.env.filters["on"] = lambda ts: temps.local_text(ts, "%Y-%m-%d")
+templates.env.filters["at"] = lambda ts: temps.local_text(ts, "%-I:%M %p")
+templates.env.filters["stamp"] = lambda ts: temps.local_text(ts, "%-d %b %Y, %-I:%M %p")
+
 NO_UNIT = "\u2014 no unit \u2014"
 API_FMT = "%Y-%m-%dT%H:%M:%S"
 LOG_WINDOW_DAYS = 89          # the API's maximum single query range
@@ -460,18 +468,17 @@ def add_person(request: Request, email: str = Form(...), calling: str = Form("")
 def remove_person(request: Request, uid: str = Form(...), name: str = Form(""),
                   back: str = Form("ward")):
     back = _roster_back(back)
-    sep = "&" if "?" in back else "?"
     try:
         client(request).revoke_user(uid)
         drop_cache(request)
-        return RedirectResponse(f"{back}{sep}msg=Removed {name or uid}", 303)
+        return RedirectResponse(_flash(back, "msg", f"Removed {name or uid}"), 303)
     except KindooError as e:
-        return RedirectResponse(f"{back}{sep}err={e}", 303)
+        return RedirectResponse(_flash(back, "err", str(e)), 303)
 
 
 @app.get("/person", response_class=HTMLResponse)
 def person_page(request: Request, uid: str = "", msg: str = "", err: str = "",
-                ddays: int = HISTORY_SLICE):
+                ddays: int = HISTORY_SLICE, back: str = ""):
     """One person: their door history, and what they can actually open.
 
     Mirrors Kindoo's own per-user Logs view. Door permissions need their own
@@ -524,13 +531,15 @@ def person_page(request: Request, uid: str = "", msg: str = "", err: str = "",
         "invited_by": _inviter(person), "invited_on": person.get("InvitedOn"),
         "slice": HISTORY_SLICE, "ddays": dslices * HISTORY_SLICE,
         "more_ddays": (dslices + 1) * HISTORY_SLICE,
-        "msg": msg, "err": err,
+        "msg": msg, "err": err, "back": back,
+        "back_url": _roster_back(back), "back_label": _back_label(back, user),
         "name": (person.get("DisplayName") or person.get("Username") or "?").strip(),
     })
 
 
 @app.get("/history", response_class=HTMLResponse)
-def history_page(request: Request, uid: str = "", hdays: int = HISTORY_SLICE):
+def history_page(request: Request, uid: str = "", hdays: int = HISTORY_SLICE,
+                 back: str = ""):
     """One person's membership audit trail, paged backwards from today."""
     user = me(request)
     hdays = max(HISTORY_SLICE, min(int(hdays or HISTORY_SLICE), 3650))
@@ -557,9 +566,11 @@ def history_page(request: Request, uid: str = "", hdays: int = HISTORY_SLICE):
         # Removed from the site: rebuild what we can from the audit trail so the
         # page still answers "who was this and what happened to them".
         if not mine:
-            return RedirectResponse("/ward?err=No record of that person", 303)
+            return RedirectResponse(_flash(_roster_back(back), "err",
+                                       "No record of that person"), 303)
         person = _person_from_log(mine)
     return templates.TemplateResponse(request, "history.html", {
+        "back": back,
         "user": user, "p": person, "history": _history(mine), "gone": gone,
         "name": (person.get("DisplayName") or person.get("Username") or "?").strip(),
         "invited_by": _inviter(person), "invited_on": person.get("InvitedOn"),
@@ -569,7 +580,8 @@ def history_page(request: Request, uid: str = "", hdays: int = HISTORY_SLICE):
 
 @app.post("/person/doors")
 def save_person_doors(request: Request, uid: str = Form(...), euid: str = Form(...),
-                      name: str = Form(""), door_ids: list[str] = Form(default=[])):
+                      name: str = Form(""), door_ids: list[str] = Form(default=[]),
+                      back: str = Form("")):
     """Set exactly which doors this person can always open.
 
     Diffed rather than reset-and-reapply: granting is additive and revoking is
@@ -596,15 +608,16 @@ def save_person_doors(request: Request, uid: str = Form(...), euid: str = Form(.
             if add:    bits.append(f"added {len(add)}")
             if remove: bits.append(f"removed {len(remove)}")
             note = f"{name}: {' and '.join(bits)} door(s)"
-        return RedirectResponse(f"/person?uid={uid}&msg={note}", 303)
+        return RedirectResponse(f"/person?uid={uid}&back={quote(back)}&msg={note}", 303)
     except KindooError as e:
-        return RedirectResponse(f"/person?uid={uid}&err=Could not change doors: {e}", 303)
+        return RedirectResponse(
+            f"/person?uid={uid}&back={quote(back)}&err=Could not change doors: {e}", 303)
 
 
 @app.post("/person/description")
 def save_person_description(request: Request, uid: str = Form(...),
                             euid: str = Form(...), name: str = Form(""),
-                            description: str = Form("")):
+                            description: str = Form(""), back: str = Form("")):
     """Change the free-text description Kindoo keeps on a person.
 
     It is the only field here that is pure annotation -- who someone is, which
@@ -617,7 +630,7 @@ def save_person_description(request: Request, uid: str = Form(...),
         drop_cache(request)
         note = (f"Updated the description for {name}" if description
                 else f"Cleared the description for {name}")
-        return RedirectResponse(f"/person?uid={uid}&msg={note}", 303)
+        return RedirectResponse(f"/person?uid={uid}&back={quote(back)}&msg={note}", 303)
     except KindooError as e:
         if e.is_permission:
             # Kindoo enforces no-self-edit on this field.
@@ -637,16 +650,17 @@ def resend_invite(request: Request, uid: str = Form(...), name: str = Form(""),
     way re-running the invite call might.
     """
     back = _roster_back(back)
-    sep = "&" if "?" in back else "?"
     try:
         client(request).resend_invitation(uid, cc_manager=bool(cc))
-        return RedirectResponse(f"{back}{sep}msg=Invitation re-sent to {name or uid}", 303)
+        return RedirectResponse(
+            _flash(back, "msg", f"Invitation re-sent to {name or uid}"), 303)
     except KindooError as e:
         if e.is_permission:
-            return RedirectResponse(
-                f"{back}{sep}err=Kindoo refused to re-send to {name or uid} "
-                f"(NoPermission) — they may no longer be in the site", 303)
-        return RedirectResponse(f"{back}{sep}err=Could not re-send to {name or uid}: {e}", 303)
+            return RedirectResponse(_flash(
+                back, "err", f"Kindoo refused to re-send to {name or uid} "
+                             f"(NoPermission) — they may no longer be in the site"), 303)
+        return RedirectResponse(
+            _flash(back, "err", f"Could not re-send to {name or uid}: {e}"), 303)
 
 
 # ---- temporary people, and their visits -----------------------------------
@@ -1004,12 +1018,30 @@ def _safe_back(back):
     return back if back in ("/", "/temp") else "/temp"
 
 
-#: Rosters a manage action can be performed from, as tokens rather than URLs --
-#: the value arrives in a form field, and a redirect target taken from one of
-#: those is somebody else's open redirect the moment it is trusted.
 def _roster_back(where):
-    return {"ward": "/ward",
-            "nounit": "/unit?name=" + quote(NO_UNIT)}.get(where, "/ward")
+    """Where a roster action, or a person page, returns to.
+
+    `where` names a roster -- a unit, or the no-unit pile -- and is checked
+    against the units this site actually has. It is never treated as a URL:
+    the value arrives in a form field or a query string, and a redirect target
+    believed from one of those is somebody else's open redirect. Anything
+    unrecognised falls back to the manager's own ward.
+    """
+    if where and (where == NO_UNIT or where in settings.units):
+        return "/unit?name=" + quote(where)
+    return "/ward"
+
+
+def _flash(url, key, text):
+    """Add a message to a URL that may already carry a query string."""
+    return f"{url}{'&' if '?' in url else '?'}{key}={text}"
+
+
+def _back_label(where, user):
+    """What to call the place the back link goes."""
+    if where and (where == NO_UNIT or where in settings.units):
+        return where
+    return user.get("unit") or "my unit"
 
 
 @app.get("/unit", response_class=HTMLResponse)

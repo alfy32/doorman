@@ -18,7 +18,7 @@
   <ul class="hist feed">
     {% for h in feed %}
     <li class="{{ h.kind }}">
-      <span class="hwhen mono">{{ h.when[:10] }}</span>
+      <span class="hwhen mono">{{ h.when|on }}</span>
       <span class="htext">
         <a class="personlink" href="{{ '/history?uid=' ~ h.uid if h.gone else '/person?uid=' ~ h.uid }}"><b>{% if h.has_name %}{{ h.name }}{% else %}{{ h.email }}{% endif %}</b></a>
         {% if h.gone %}<span class="chip">no longer in site</span>{% endif %}

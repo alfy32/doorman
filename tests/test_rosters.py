@@ -74,13 +74,13 @@ assert "Read-only" in theirs
 print("  another unit's page: still read-only")
 
 print("\n--- acting there returns there, not to my ward ---")
-r = c.post("/remove", data={"uid": "3", "name": "No Unit Person", "back": "nounit"},
+r = c.post("/remove", data={"uid": "3", "name": "No Unit Person", "back": NO_UNIT},
            follow_redirects=False)
 print("  removed ->", r.headers["location"][:70])
 assert r.headers["location"].startswith("/unit?name=")
 assert "msg=" in r.headers["location"] and FakeKindoo.revoked == ["3"]
 
-r = c.post("/resend", data={"uid": "4", "name": "", "back": "nounit"}, follow_redirects=False)
+r = c.post("/resend", data={"uid": "4", "name": "", "back": NO_UNIT}, follow_redirects=False)
 print("  resent  ->", r.headers["location"][:70])
 assert r.headers["location"].startswith("/unit?name=") and FakeKindoo.resent == ["4"]
 
@@ -92,5 +92,10 @@ r = c.post("/remove", data={"uid": "2", "name": "x", "back": "https://evil.examp
            follow_redirects=False)
 print("  offsite back ->", r.headers["location"][:70])
 assert r.headers["location"].startswith("/ward"), "must not bounce off-site"
+
+r = c.post("/remove", data={"uid": "2", "name": "x", "back": "Not A Real Unit"},
+           follow_redirects=False)
+print("  unknown unit ->", r.headers["location"][:70])
+assert r.headers["location"].startswith("/ward"), "an unknown roster falls back to the ward"
 
 print("\nALL OK")

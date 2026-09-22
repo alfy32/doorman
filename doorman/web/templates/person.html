@@ -1,5 +1,5 @@
 {% extends "base.html" %}{% block body %}
-<p class="sub" style="margin-top:0"><a href="/ward">&larr; back to {{ user.unit or "my unit" }}</a></p>
+<p class="sub" style="margin-top:0"><a href="{{ back_url }}">&larr; back to {{ back_label }}</a></p>
 {% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
 {% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
 
@@ -14,6 +14,7 @@
   <details class="otherdoors" style="margin-top:4px">
     <summary>Edit description</summary>
     <form method="post" action="/person/description" style="padding-top:8px">
+      <input type="hidden" name="back" value="{{ back }}">
       <input type="hidden" name="uid"  value="{{ p.UserID }}">
       <input type="hidden" name="euid" value="{{ p.EUID }}">
       <input type="hidden" name="name" value="{{ name }}">
@@ -36,13 +37,13 @@
       {% if invited_by.email and invited_by.email != invited_by.name %}
       <span class="mono">({{ invited_by.email }})</span>{% endif %}
     {% endif %}
-    {% if invited_on %}on {{ invited_on[:10] }}{% endif %}
+    {% if invited_on %}on {{ invited_on|on }}{% endif %}
   </div>
   {% endif %}
   <p class="sub" style="margin:8px 0 0">
-    <a class="btnlink" href="/history?uid={{ p.UserID }}">Account history &rarr;</a></p>
+    <a class="btnlink" href="/history?uid={{ p.UserID }}&amp;back={{ back|urlencode }}">Account history &rarr;</a></p>
   <div class="tags" style="margin-top:8px">
-    {% if not accepted %}<span class="chip bad">invited {{ (p.InvitedOn or '')[:10] }} &middot; not accepted</span>{% endif %}
+    {% if not accepted %}<span class="chip bad">invited {{ p.InvitedOn|on }} &middot; not accepted</span>{% endif %}
     {% if p.IsTempUser %}<span class="chip warn">temporary</span>{% endif %}
     <span class="chip ok">{{ ok_count }} opened</span>
     {% if denied_count %}<span class="chip bad">{{ denied_count }} refused</span>{% endif %}
@@ -72,6 +73,7 @@
   <details class="otherdoors" style="margin-top:10px">
     <summary>Change their doors</summary>
     <form method="post" action="/person/doors" style="padding-top:8px">
+      <input type="hidden" name="back" value="{{ back }}">
       <input type="hidden" name="uid"  value="{{ p.UserID }}">
       <input type="hidden" name="euid" value="{{ p.EUID }}">
       <input type="hidden" name="name" value="{{ name }}">
@@ -98,7 +100,7 @@
         {% if not l.Success %}<div class="ds" style="color:var(--bad)">{{ l.ReasonText or 'refused' }}</div>{% endif %}
       </div>
       <div class="meta">
-        <div class="when"><b>{{ (l.Timestamp or '')[:10] }}</b><span class="dt">{{ (l.Timestamp or '')[11:16] }}</span></div>
+        <div class="when"><b>{{ l.Timestamp|on }}</b><span class="dt">{{ l.Timestamp|at }}</span></div>
         {% if l.Success %}<span class="chip ok">opened</span>{% else %}<span class="chip bad">refused</span>{% endif %}
       </div>
     </li>
@@ -110,7 +112,7 @@
 
   <p style="margin:12px 0 0">
     <a class="btnlink"
-       href="/person?uid={{ p.UserID }}&amp;ddays={{ more_ddays }}&amp;hdays={{ hdays }}">
+       href="/person?uid={{ p.UserID }}&amp;ddays={{ more_ddays }}&amp;hdays={{ hdays }}&amp;back={{ back|urlencode }}">
       Load {{ slice }} more days</a>
     <span class="sub" style="margin-left:8px">showing back {{ ddays }} days</span>
   </p>

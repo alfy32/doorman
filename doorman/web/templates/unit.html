@@ -24,7 +24,7 @@
     {% for r in rows %}
     <li data-search="{{ (r.name ~ ' ' ~ r.email ~ ' ' ~ r.desc)|lower }}">
       <div class="who">
-        <div class="nm"><a class="personlink" href="/person?uid={{ r.uid }}">{% if r.has_name %}{{ r.name }}{% else %}<span class="noname">no name yet</span>{% endif %}</a></div>
+        <div class="nm"><a class="personlink" href="/person?uid={{ r.uid }}&amp;back={{ unit|urlencode }}">{% if r.has_name %}{{ r.name }}{% else %}<span class="noname">no name yet</span>{% endif %}</a></div>
         <div class="em">{{ r.email }}</div>
         <div class="ds">
           {{ r.desc }}
@@ -38,7 +38,7 @@
       </div>
       <div class="meta">
         <div class="when">
-          {% if r.last %}<b>{{ r.days }}d ago</b><span class="dt">{{ r.last[:10] }}</span>
+          {% if r.last %}<b>{{ r.days }}d ago</b><span class="dt">{{ r.last|on }}</span>
           {% elif r.denied %}<b style="color:var(--bad)">denied</b><span class="dt">tried {{ r.denied_days }}d ago</span>
           {% else %}<b>never</b><span class="dt">in {{ window }}d</span>{% endif %}
         </div>
@@ -49,7 +49,7 @@
                 onsubmit="return confirm('Have Kindoo email the invitation to {{ r.email }} again?')">
             <input type="hidden" name="uid" value="{{ r.uid }}">
             <input type="hidden" name="name" value="{{ r.name }}">
-            <input type="hidden" name="back" value="nounit">
+            <input type="hidden" name="back" value="{{ unit }}">
             <button class="danger" type="submit" title="Send the invitation email again">Resend</button>
           </form>
           {% endif %}
@@ -57,7 +57,7 @@
                 onsubmit="return confirm('Remove {{ r.name }}? This frees their seat and they lose door access.')">
             <input type="hidden" name="uid" value="{{ r.uid }}">
             <input type="hidden" name="name" value="{{ r.name }}">
-            <input type="hidden" name="back" value="nounit">
+            <input type="hidden" name="back" value="{{ unit }}">
             <button class="danger" type="submit">Remove</button>
           </form>
         </span>
