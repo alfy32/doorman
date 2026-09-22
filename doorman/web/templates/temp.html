@@ -178,6 +178,16 @@
             <input type="hidden" name="visit_id" value="{{ v.id }}">
             <button class="danger" type="submit">End access</button>
           </form>
+          {% elif v.state not in ('ended', 'cancelled') %}
+          {# Anything that never opened can be called off: a booking still to
+             come, one whose window passed unused, one that failed. There is no
+             Kindoo user behind any of them, so there is nothing to undo. #}
+          <form method="post" action="/temp/cancel"
+                onsubmit="return confirm('Call off {{ v.email }} for {{ v.starts_text }}?\n\nNothing was created in Kindoo, so there is nothing to undo.')">
+            <input type="hidden" name="visit_id" value="{{ v.id }}">
+            <button class="danger" type="submit"
+                    title="Call off this booking">Cancel</button>
+          </form>
           {% endif %}
         </span>
       </div>

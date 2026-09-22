@@ -197,6 +197,13 @@ soon_e = (dt.datetime.now(temps.zone()) + dt.timedelta(days=2, hours=2)).strftim
 c.post("/temp/new", data={"email": "offagain@x.com", "name": "Off Again", "preset": "range",
                           "starts": soon_s, "ends": soon_e, "go": "now"}, follow_redirects=False)
 booking = [x for x in store.list_temp_visits("me@x.com") if x["email"] == "offagain@x.com"][0]
+# the button has to be on the page, not just the route -- it went missing once
+page = get("/temp")
+visits_block = page[page.index("Every visit"):]
+assert '/temp/cancel' in visits_block, "every unopened visit needs a Cancel button"
+assert visits_block.count('action="/temp/cancel"') >= 1
+print("  Cancel is rendered in the visit list:",
+      visits_block.count('action="/temp/cancel"'), "button(s)")
 before = len(FakeKindoo.invites), len(FakeKindoo.revoked)
 r = c.post("/temp/cancel", data={"visit_id": booking["id"]}, follow_redirects=False)
 booking = store.get_temp_visit("me@x.com", booking["id"])
