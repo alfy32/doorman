@@ -1143,35 +1143,43 @@ def changes_page(request: Request, days: int = HISTORY_SLICE, scope: str = "mine
 
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, msg: str = ""):
-    """The one page that has to render without a Kindoo token, since it is
-    where the token gets pasted. No token means no door list -- which is the
-    whole reason to be here -- so the page says so instead of failing."""
+    """The one page that has to render without a working Kindoo token, since
+    it is where the token gets pasted. A missing token and a token Kindoo has
+    rejected (expired, or killed by signing out of Kindoo) both mean no door
+    list -- which is the whole reason to be here -- so the page says so
+    instead of failing. Any other Kindoo failure still gets the error page."""
     user = me(request)
     needs_token = not settings.token_for_account(user)
+    token_rejected = False
     doors = []
     if not needs_token:
         try:
             doors = cached(request, "doors", client(request).entry_points, ttl=600)
         except KindooError as e:
-            return templates.TemplateResponse(request, "error.html",
-                                              {"user": user, "err": e}, status_code=503)
+            if not e.is_auth:
+                return templates.TemplateResponse(request, "error.html",
+                                                  {"user": user, "err": e}, status_code=503)
+            token_rejected = True
     chosen = set(user.get("door_ids") or [])
     return templates.TemplateResponse(request, "settings.html", {
         "user": user, "doors": sorted(doors, key=lambda d: d.get("Name") or ""),
         "chosen": chosen, "msg": msg, "units": settings.units,
-        "alloc": settings.seat_allocation, "needs_token": needs_token})
+        "alloc": settings.seat_allocation, "needs_token": needs_token,
+        "token_rejected": token_rejected})
 
 
 @app.post("/settings")
 def save_settings(request: Request, door_ids: list[str] = Form(default=[]),
-                  unit: str = Form(""), token: str = Form(""), name: str = Form("")):
+                  unit: str = Form(""), token: str = Form(""), name: str = Form(""),
+                  doors_shown: str = Form("")):
     """Persist this manager's own settings to the database."""
     email = me(request).get("email")
     unit = unit.strip()
     if unit and unit not in settings.units:       # only a configured unit
         unit = ""
-    fields = {"door_ids": [int(d) for d in door_ids if d.strip()],
-              "name": name.strip()}
+    fields = {"name": name.strip()}
+    if doors_shown:      # no door list on the page (no/rejected token) means
+        fields["door_ids"] = [int(d) for d in door_ids if d.strip()]  # keep as is
     if unit:
         fields["unit"] = unit
     if token.strip():                      # blank means "leave it alone"

@@ -278,4 +278,26 @@ assert r.status_code == 200, f"home still blocked after saving a token: {r.statu
 assert "SOUTH DOOR" in c3.get("/settings").text, "doors appear once the token is in"
 print("  token saved -> the rest of the app opens up")
 
+print("\n--- a token Kindoo has rejected (expired / signed out) ---")
+# Regression: Settings used to show the "Can't reach Kindoo" error page here,
+# whose only advice was "paste a fresh token on Settings" -- a dead end.
+class RejectingKindoo(FakeKindoo):
+    def entry_points(self):
+        raise webapp.KindooError("KindooGetEnvironmentEntryPoints", 401, "")
+webapp.Kindoo = RejectingKindoo
+webapp._cache.clear()
+store.update_account("new@x.com", door_ids=[11, 12])
+r = c3.get("/settings")
+assert r.status_code == 200, f"Settings must render with a rejected token: {r.status_code}"
+assert "rejected your saved session" in r.text and 'name="token"' in r.text
+print("  Settings renders the token form with a warning")
+c3.post("/settings", data={"token": "fresh", "unit": UNIT, "name": "New"},
+        follow_redirects=False)
+acct = store.get_account("new@x.com")
+assert acct["token"] == "fresh", "new token saved"
+assert acct["door_ids"] == [11, 12], f"default doors must survive: {acct['door_ids']}"
+print("  fresh token saved, default doors untouched")
+webapp.Kindoo = FakeKindoo
+webapp._cache.clear()
+
 print("\nALL OK")
