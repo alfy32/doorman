@@ -1058,10 +1058,11 @@ def _back_label(where, user):
 def unit_page(request: Request, name: str = "", msg: str = "", err: str = ""):
     """The people in any unit.
 
-    Another unit's roster is read-only -- it is its own manager's business, and
-    only your own (/ward) is managed. The people whose description names **no**
-    unit are the exception: they belong to nobody, so nobody would ever be able
-    to tidy them up under that rule. Any manager can act on those.
+    Any manager can remove anyone from any unit's roster -- freeing seats in
+    the shared pool is everybody's business. Everything else about another
+    unit is its own manager's, and only your own (/ward) is fully managed. The
+    people whose description names **no** unit are the exception: they belong
+    to nobody, so any manager can also re-send their invitations.
     """
     user = me(request)
     if name and name == (user.get("unit") or ""):

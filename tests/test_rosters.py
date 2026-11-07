@@ -60,7 +60,7 @@ print("  my unit ->", "/ward" if 'href="/ward"' in row else "WRONG")
 assert '"/unit?name=' in body, "other units still link to their read-only roster"
 print("  other units -> /unit?name=...")
 
-print("\n--- the no-unit roster is managed, other units are not ---")
+print("\n--- the no-unit roster is managed; other units only allow Remove ---")
 mine_free = c.get(nounit_url).text
 assert "No Unit Person" in mine_free and "Their Person" not in mine_free
 assert 'action="/remove"' in mine_free, "no-unit people must be removable by anyone"
@@ -69,9 +69,9 @@ assert "any manager can act here" in mine_free
 print("  no-unit page: Remove + Resend present")
 
 theirs = c.get("/unit?name=" + urllib.parse.quote(OTHER)).text
-assert 'action="/remove"' not in theirs, "another unit's roster must stay read-only"
-assert "Read-only" in theirs
-print("  another unit's page: still read-only")
+assert 'action="/remove"' in theirs, "anyone may remove people from another unit"
+assert 'action="/resend"' not in theirs, "but not re-send their invitations"
+print("  another unit's page: Remove only")
 
 print("\n--- acting there returns there, not to my ward ---")
 r = c.post("/remove", data={"uid": "3", "name": "No Unit Person", "back": NO_UNIT},

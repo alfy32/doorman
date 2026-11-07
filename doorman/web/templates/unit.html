@@ -42,9 +42,8 @@
           {% elif r.denied %}<b style="color:var(--bad)">denied</b><span class="dt">tried {{ r.denied_days }}d ago</span>
           {% else %}<b>never</b><span class="dt">in {{ window }}d</span>{% endif %}
         </div>
-        {% if manage %}
         <span class="acts">
-          {% if not r.accepted %}
+          {% if manage and not r.accepted %}
           <form method="post" action="/resend"
                 onsubmit="return confirm('Have Kindoo email the invitation to {{ r.email }} again?')">
             <input type="hidden" name="uid" value="{{ r.uid }}">
@@ -61,7 +60,6 @@
             <button class="danger" type="submit">Remove</button>
           </form>
         </span>
-        {% endif %}
       </div>
     </li>
     {% endfor %}
@@ -73,8 +71,9 @@
     nobody owns them — any manager can act here. Click a name to give them a
     unit, change their doors, or see where they have been.</p>
   {% else %}
-  <p class="sub" style="margin-bottom:0">Read-only — this is another unit's roster.
-    Manage your own on <a href="/ward">My unit</a>.</p>
+  <p class="sub" style="margin-bottom:0">This is another unit's roster. Any
+    manager can remove someone here; everything else is managed on
+    <a href="/ward">My unit</a>.</p>
   {% endif %}
 </div>
 
