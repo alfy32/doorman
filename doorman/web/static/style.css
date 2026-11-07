@@ -170,6 +170,9 @@ ul.people li:last-child{border-bottom:0}
 .meta{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .meta form{margin:0}
 .acts{display:flex;gap:6px;align-items:center}
+.moveunit{display:flex;gap:4px;align-items:center}
+.moveunit select{padding:4px 8px;font-size:13px;max-width:11em}
+.moveunit button{padding:4px 10px;font-size:13px}
 .btnlink{display:inline-block;padding:4px 10px;border:1px solid var(--line);border-radius:8px;
   font-size:13px;color:var(--muted);text-decoration:none}
 .btnlink:hover{color:var(--accent);border-color:var(--accent)}

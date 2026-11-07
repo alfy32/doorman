@@ -542,6 +542,10 @@ def person_page(request: Request, uid: str = "", msg: str = "", err: str = "",
         "slice": HISTORY_SLICE, "ddays": dslices * HISTORY_SLICE,
         "more_ddays": (dslices + 1) * HISTORY_SLICE,
         "msg": msg, "err": err, "back": back,
+        # Only somebody whose description names no unit can be moved into one.
+        "move_units": (settings.units
+                       if match_unit_fuzzy(person.get("Description") or "") is None
+                       else []),
         "back_url": _roster_back(back), "back_label": _back_label(back, user),
         "name": (person.get("DisplayName") or person.get("Username") or "?").strip(),
     })
@@ -649,6 +653,45 @@ def save_person_description(request: Request, uid: str = Form(...),
                 f"description (NoPermission) — another manager has to do it", 303)
         return RedirectResponse(
             f"/person?uid={uid}&err=Could not change the description: {e}", 303)
+
+
+@app.post("/person/unit")
+def move_to_unit(request: Request, uid: str = Form(...), unit: str = Form(""),
+                 back: str = Form("")):
+    """Put somebody whose description names no unit into one.
+
+    A unit is only ever a name in the description, so this rewrites it the way
+    /add would: the unit, spelled the way the site spells it, with whatever the
+    description said before kept in brackets -- it is usually their calling.
+    Only for people who name no unit now: moving a person out of somebody
+    else's unit is that unit's business.
+    """
+    def to_person(key, text):
+        return RedirectResponse(
+            f"/person?uid={quote(str(uid))}&back={quote(back)}&{key}={quote(text)}", 303)
+
+    if unit not in settings.units:
+        return to_person("err", "Pick a unit to move them to")
+    k = client(request)
+    try:
+        person = next((u for u in k.users() if str(u.get("UserID")) == str(uid)), None)
+        if not person:
+            return RedirectResponse(_flash(_roster_back(back), "err",
+                                           "They are no longer in the site"), 303)
+        name = (person.get("DisplayName") or person.get("Username") or uid).strip()
+        old = (person.get("Description") or "").strip()
+        current = match_unit_fuzzy(old)
+        if current is not None:
+            return to_person("err", f"{name} is already in {current}")
+        written = settings.write_name(unit)
+        k.edit_description(person.get("EUID"), f"{written} ({old})" if old else written)
+        drop_cache(request)
+        return to_person("msg", f"Moved {name} to {unit}")
+    except KindooError as e:
+        if e.is_permission:
+            return to_person("err", "Kindoo will not let you edit your own description "
+                                    "(NoPermission) — another manager has to do it")
+        return to_person("err", f"Could not move them: {e}")
 
 
 @app.post("/resend")

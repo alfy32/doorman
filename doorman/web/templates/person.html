@@ -11,6 +11,20 @@
   <p class="sub" style="margin:4px 0 0">Kindoo won't let you edit your own
     description &mdash; another manager has to.</p>
   {% else %}
+  {% if move_units %}
+  <form method="post" action="/person/unit" class="moveunit" style="margin-top:6px"
+        onsubmit="return confirm('Move {{ name }} to ' + this.unit.value + '?')">
+    <input type="hidden" name="back" value="{{ back }}">
+    <input type="hidden" name="uid"  value="{{ p.UserID }}">
+    <select name="unit" required aria-label="Unit to move {{ name }} to">
+      <option value="">Move to a unit…</option>
+      {% for u in move_units %}<option>{{ u }}</option>{% endfor %}
+    </select>
+    <button type="submit">Move</button>
+  </form>
+  <p class="sub" style="margin:4px 0 0">Their description names no unit. Moving
+    puts the unit at the front and keeps what it said before in brackets.</p>
+  {% endif %}
   <details class="otherdoors" style="margin-top:4px">
     <summary>Edit description</summary>
     <form method="post" action="/person/description" style="padding-top:8px">
