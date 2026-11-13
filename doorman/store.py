@@ -8,7 +8,7 @@ list of email addresses allowed to sign up) stays in config.json, hand-edited.
 Only this module knows about SQLite; if a server database is ever needed, the
 rest of the app is unaffected.
 """
-import json, os, sqlite3
+import contextlib, json, os, sqlite3
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -92,12 +92,21 @@ CREATE INDEX IF NOT EXISTS temp_visits_due ON temp_visits (status, starts_at);
 """
 
 
+@contextlib.contextmanager
 def connect():
+    """Open the database for one `with` block: commit on success, roll back on
+    error, and always close. sqlite3's own context manager only commits -- it
+    leaves the connection open, which leaked one file handle per call until the
+    process hit its open-file limit and could no longer open the database."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB_PATH)
-    con.row_factory = sqlite3.Row
-    con.executescript(SCHEMA)
-    return con
+    try:
+        con.row_factory = sqlite3.Row
+        con.executescript(SCHEMA)
+        with con:
+            yield con
+    finally:
+        con.close()
 
 
 def _row(r):
